@@ -38,7 +38,7 @@ class VideoDataset(Dataset):
         for i in range(0, 1000):
             video_id = anomaly_videos[np.random.randint(0, len(anomaly_videos), 1)[0]]
 
-            l, r = raw_set[video_id][0], raw_set[video_id][1]
+            l, r = raw_set[video_id][0] * config.video_fps, raw_set[video_id][1] * config.video_fps
             anomaly_box = raw_set[video_id][2:6]
             print(anomaly_box)
 
@@ -48,6 +48,7 @@ class VideoDataset(Dataset):
                 lt = np.random.randint(0, config.prepare_video_max_len, 1)[0]
                 if lt >= l:
                     lt +=  r - l
+                    lt = min(lt, config.prepare_video_max_len - config.prepare_len)
                 rt = lt + config.prepare_len
                 if rt > config.prepare_video_max_len:
                     is_anomaly = True
@@ -70,6 +71,7 @@ class VideoDataset(Dataset):
                 x1 = np.random.randint(0, config.video_size[0] - crop_size[0], 1)[0]
                 y1 = np.random.randint(0, config.video_size[1] - crop_size[1], 1)[0]
                 x2, y2 = np.array([x1, y1]) + np.array(crop_size)
+
             print('%d %d %d %d %d %d' % (lt, rt, x1, y1, x2, y2))
 
             #process video
@@ -90,16 +92,16 @@ class VideoDataset(Dataset):
             data_hdf5.attrs['anomaly'] = 0
 
             #debug
-            # print(np.shape(processed_vid))
-            # fig = plt.figure()
-            # ims = []
-            # for ii in range(0, np.shape(processed_vid)[1]):
-            #     im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
-            #     ims.append([im])
-            # ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
-            # plt.show()
+            print(np.shape(processed_vid))
+            fig = plt.figure()
+            ims = []
+            for ii in range(0, np.shape(processed_vid)[1]):
+                im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
+                ims.append([im])
+            ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
+            plt.show()
             
-            # print('finish')
+            print('finish')
 
         #get 2000 normal samples from normal videos
         for i in range(1000, 3000):
@@ -130,22 +132,32 @@ class VideoDataset(Dataset):
             data_hdf5.attrs['anomaly'] = 0
 
     def prepare_anomaly(self, config, dataset, anomaly_videos, normal_videos, raw_set):
-        crop_size = config.prepare_crop_size
+        
         #prepare_train
         #get 3000 anomaly samples from abnormal videos
         for i in range(0, 3000):
             video_id = anomaly_videos[np.random.randint(0, len(anomaly_videos), 1)[0]]
 
-            l, r = raw_set[video_id][0], raw_set[video_id][1]
+            l, r = raw_set[video_id][0] * config.video_fps, raw_set[video_id][1] * config.video_fps
             anomaly_box = raw_set[video_id][2:6]
             print(anomaly_box)
+            crop_size = config.prepare_crop_size
+            crop_size[0] = int(max(crop_size[0], (anomaly_box[2] - anomaly_box[0])/2))
+            crop_size[1] = int(max(crop_size[1], (anomaly_box[3] - anomaly_box[1])/2))
             #find random abnormal interval
             lt = np.random.randint(l, r - config.prepare_len, 1)[0]
             rt = lt + config.prepare_len
             
-            x1 = np.random.randint(max(0, anomaly_box[0] - crop_size[0]/2), anomaly_box[2] - crop_size[0]/2, 1)[0]
-            y1 = np.random.randint(max(0, anomaly_box[1] - crop_size[1]/2), anomaly_box[3] - crop_size[1]/2, 1)[0]
+            # x1 = np.random.randint(anomaly_box[0], anomaly_box[2] - int(crop_size[0]/2), 1)[0]
+            # y1 = np.random.randint(anomaly_box[1], anomaly_box[3] - int(crop_size[1]/2), 1)[0]
+
+            crop_size = [anomaly_box[2] - anomaly_box[0], anomaly_box[3] - anomaly_box[1]]
+            x1 = anomaly_box[0]
+            y1 = anomaly_box[1]
+            
             x2, y2 = np.array([x1, y1]) + np.array(crop_size)
+            x2 = min(x2, config.video_size[0])
+            y2 = min(y2, config.video_size[1])
             print('%d %d %d %d %d %d' % (lt, rt, x1, y1, x2, y2))
 
             #process video
@@ -154,6 +166,10 @@ class VideoDataset(Dataset):
             processed_vid = [[], [], []]
             for frame_id in range(lt, rt, int(config.prepare_len / config.prepare_len_sample)):
                 rgb = vid.get_data(frame_id)
+                # plt.imshow(rgb)
+                # plt.show()
+                # print(np.shape(rgb))
+                # print(y1, ' ', y2)
                 temp_rgb = rgb[y1:y2, x1:x2, :]
                 temp_rgb = np.swapaxes(temp_rgb, 1, 2)
                 temp_rgb = np.swapaxes(temp_rgb, 0, 1)
@@ -166,16 +182,16 @@ class VideoDataset(Dataset):
             data_hdf5.attrs['anomaly'] = 1
 
             #debug
-            print(np.shape(processed_vid))
-            fig = plt.figure()
-            ims = []
-            for ii in range(0, np.shape(processed_vid)[1]):
-                im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
-                ims.append([im])
-            ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
-            plt.show()
+            # print(np.shape(processed_vid))
+            # fig = plt.figure()
+            # ims = []
+            # for ii in range(0, np.shape(processed_vid)[1]):
+            #     im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
+            #     ims.append([im])
+            # ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
+            # plt.show()
             
-            print('finish')
+            # print('finish')
 
     def prepare_data(self, config):
 
@@ -197,7 +213,7 @@ class VideoDataset(Dataset):
         train_set.attrs['normal_length'] = 3000
         train_set.attrs['anomaly_length'] = 3000
 
-        #self.prepare_normal(config, train_set, anomaly_videos, normal_videos, raw_set)
+        self.prepare_normal(config, train_set, anomaly_videos, normal_videos, raw_set)
         self.prepare_anomaly(config, train_set, anomaly_videos, normal_videos, raw_set)
 
         hdf5_dataset.close()

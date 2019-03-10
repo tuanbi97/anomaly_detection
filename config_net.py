@@ -14,3 +14,4 @@ prepare_len = 150
 prepare_len_sample = 30
 prepare_video_max_len = 26000
 video_size = [800, 410]
+video_fps = 30
