@@ -3,7 +3,6 @@ from datetime import datetime
 import socket
 import os
 import glob
-from tqdm import tqdm
 
 import torch
 from tensorboardX import SummaryWriter
@@ -12,7 +11,9 @@ from torch.utils.data import DataLoader
 from torch.autograd import Variable
 
 from dataloaders.dataset import VideoDataset
-from network import C3D_model, R2Plus1D_model, R3D_model
+# from network import C3D_model, R2Plus1D_model, R3D_model
+from network import R2Plus1D_model
+import config_net as config
 
 # Use GPU if available else revert to CPU
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -56,18 +57,10 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
             num_classes (int): Number of classes in the data
             num_epochs (int, optional): Number of epochs to train for.
     """
-
-    if modelName == 'C3D':
-        model = C3D_model.C3D(num_classes=num_classes, pretrained=True)
-        train_params = [{'params': C3D_model.get_1x_lr_params(model), 'lr': lr},
-                        {'params': C3D_model.get_10x_lr_params(model), 'lr': lr * 10}]
-    elif modelName == 'R2Plus1D':
+    if modelName == 'R2Plus1D':
         model = R2Plus1D_model.R2Plus1DClassifier(num_classes=num_classes, layer_sizes=(2, 2, 2, 2))
         train_params = [{'params': R2Plus1D_model.get_1x_lr_params(model), 'lr': lr},
                         {'params': R2Plus1D_model.get_10x_lr_params(model), 'lr': lr * 10}]
-    elif modelName == 'R3D':
-        model = R3D_model.R3DClassifier(num_classes=num_classes, layer_sizes=(2, 2, 2, 2))
-        train_params = model.parameters()
     else:
         print('We only implemented C3D and R2Plus1D models.')
         raise NotImplementedError
@@ -94,7 +87,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     writer = SummaryWriter(log_dir=log_dir)
 
     print('Training model on {} dataset...'.format(dataset))
-    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=16), batch_size=20, shuffle=True, num_workers=4)
+    train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, split='train'), batch_size=20, shuffle=True, num_workers=1)
 
     for epoch in range(resume_epoch, num_epochs):
         # each epoch has a training and validation step
@@ -114,7 +107,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
             else:
                 model.eval()
 
-            for inputs, labels in tqdm(train_dataloader):
+            for inputs, labels in train_dataloader:
                 # move inputs and labels to the device the training is taking place on
                 inputs = Variable(inputs, requires_grad=True).to(device)
                 labels = Variable(labels).to(device)
