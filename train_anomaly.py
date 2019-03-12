@@ -95,14 +95,10 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
 
     print('Training model on {} dataset...'.format(dataset))
     train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=16), batch_size=20, shuffle=True, num_workers=4)
-    val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=16), batch_size=20, num_workers=4)
-
-    trainval_loaders = {'train': train_dataloader, 'val': val_dataloader}
-    trainval_sizes = {x: len(trainval_loaders[x].dataset) for x in ['train', 'val']}
 
     for epoch in range(resume_epoch, num_epochs):
         # each epoch has a training and validation step
-        for phase in ['train', 'val']:
+        for phase in ['train']:
             start_time = timeit.default_timer()
 
             # reset the running loss and corrects
@@ -118,7 +114,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
             else:
                 model.eval()
 
-            for inputs, labels in tqdm(trainval_loaders[phase]):
+            for inputs, labels in tqdm(train_dataloader):
                 # move inputs and labels to the device the training is taking place on
                 inputs = Variable(inputs, requires_grad=True).to(device)
                 labels = Variable(labels).to(device)
@@ -126,9 +122,6 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
 
                 if phase == 'train':
                     outputs = model(inputs)
-                else:
-                    with torch.no_grad():
-                        outputs = model(inputs)
 
                 probs = nn.Softmax(dim=1)(outputs)
                 preds = torch.max(probs, 1)[1]
@@ -141,15 +134,12 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
 
-            epoch_loss = running_loss / trainval_sizes[phase]
-            epoch_acc = running_corrects.double() / trainval_sizes[phase]
+            epoch_loss = running_loss / len(train_dataloader.dataset)
+            epoch_acc = running_corrects.double() / len(train_dataloader.dataset)
 
             if phase == 'train':
                 writer.add_scalar('data/train_loss_epoch', epoch_loss, epoch)
                 writer.add_scalar('data/train_acc_epoch', epoch_acc, epoch)
-            else:
-                writer.add_scalar('data/val_loss_epoch', epoch_loss, epoch)
-                writer.add_scalar('data/val_acc_epoch', epoch_acc, epoch)
 
             print("[{}] Epoch: {}/{} Loss: {} Acc: {}".format(phase, epoch+1, nEpochs, epoch_loss, epoch_acc))
             stop_time = timeit.default_timer()

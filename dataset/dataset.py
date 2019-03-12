@@ -60,17 +60,14 @@ class VideoDataset(Dataset):
                     is_anomaly = True
                 if is_anomaly == False:
                     break
-            
-            x1 = np.random.randint(0, config.video_size[0] - crop_size[0], 1)[0]
-            y1 = np.random.randint(0, config.video_size[1] - crop_size[1], 1)[0]
-            x2, y2 = np.array([x1, y1]) + np.array(crop_size)
+
             while is_anomaly == True:
-                intersect = self.box_intersect([x1, y1, x2, y2], anomaly_box)
-                if intersect / ((x2 - x1) *(y2 - y1)) < 0.5:
-                    is_anomaly = False
                 x1 = np.random.randint(0, config.video_size[0] - crop_size[0], 1)[0]
                 y1 = np.random.randint(0, config.video_size[1] - crop_size[1], 1)[0]
                 x2, y2 = np.array([x1, y1]) + np.array(crop_size)
+                intersect = self.box_intersect([x1, y1, x2, y2], anomaly_box)
+                if intersect == 0:
+                    is_anomaly = False
 
             print('%d %d %d %d %d %d' % (lt, rt, x1, y1, x2, y2))
 
@@ -142,8 +139,6 @@ class VideoDataset(Dataset):
             anomaly_box = raw_set[video_id][2:6]
             print(anomaly_box)
             crop_size = config.prepare_crop_size
-            crop_size[0] = int(max(crop_size[0], (anomaly_box[2] - anomaly_box[0])/2))
-            crop_size[1] = int(max(crop_size[1], (anomaly_box[3] - anomaly_box[1])/2))
             #find random abnormal interval
             lt = np.random.randint(l, r - config.prepare_len, 1)[0]
             rt = lt + config.prepare_len
@@ -151,9 +146,12 @@ class VideoDataset(Dataset):
             # x1 = np.random.randint(anomaly_box[0], anomaly_box[2] - int(crop_size[0]/2), 1)[0]
             # y1 = np.random.randint(anomaly_box[1], anomaly_box[3] - int(crop_size[1]/2), 1)[0]
 
-            crop_size = [anomaly_box[2] - anomaly_box[0], anomaly_box[3] - anomaly_box[1]]
-            x1 = anomaly_box[0]
-            y1 = anomaly_box[1]
+            low = min(anomaly_box[0], max(anomaly_box[2] - crop_size[0], 0))
+            high = anomaly_box[0]
+            x1 = np.random.randint(low, high, 1)[0]
+            low = min(anomaly_box[1], max(anomaly_box[3] - crop_size[1], 0))
+            high = anomaly_box[1]
+            y1 = np.random.randint(low, high, 1)[0]
             
             x2, y2 = np.array([x1, y1]) + np.array(crop_size)
             x2 = min(x2, config.video_size[0])
