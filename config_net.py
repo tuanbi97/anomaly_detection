@@ -20,3 +20,9 @@ video_fps = 30
 resize_h = 128
 resize_w = 171
 crop_size = 112
+
+
+#test
+test_dir='/media/tuanbi97/Vesty/Datasets/aic19-track3-test-data/'
+test_video_step = 150
+test_frame_step = [160, 125]

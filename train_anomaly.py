@@ -21,7 +21,7 @@ print("Device being used:", device)
 
 nEpochs = 100  # Number of epochs for training
 resume_epoch = 0  # Default is 0, change if want to resume
-snapshot = 50 # Store a model every snapshot epochs
+snapshot = 2 # Store a model every snapshot epochs
 lr = 1e-3 # Learning rate
 
 dataset = 'aicity' #ai city dataset
@@ -87,7 +87,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     writer = SummaryWriter(log_dir=log_dir)
 
     print('Training model on {} dataset...'.format(dataset))
-    train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, split='train'), batch_size=20, shuffle=True, num_workers=1)
+    train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, split='train'), batch_size=2, shuffle=True, num_workers=1)
 
     for epoch in range(resume_epoch, num_epochs):
         # each epoch has a training and validation step
