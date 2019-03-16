@@ -1,7 +1,8 @@
 import math
 import torch.nn as nn
 from torch.nn.modules.utils import _triple
-
+import config_net as config
+import torch
 
 class SpatioTemporalConv(nn.Module):
     r"""Applies a factored 3D convolution over an input signal composed of several input
@@ -251,10 +252,12 @@ class R2Plus1DClassifier(nn.Module):
         return logits
 
     def __load_pretrained_weights(self):
+        p_dict = torch.load(config.model_dir)['state_dict']
         s_dict = self.state_dict()
         for name in s_dict:
             print(name)
-            print(s_dict[name].size())
+            s_dict[name] = p_dict[name]
+        self.load_state_dict(s_dict)
 
     def __init_weight(self):
         for m in self.modules():

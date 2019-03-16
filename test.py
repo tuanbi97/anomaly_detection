@@ -4,17 +4,32 @@ import config_net as config
 import imageio
 import cv2
 import numpy as np
+import time
+import matplotlib.pyplot as plt
 
-video_id = '1.mp4'
+from torch.autograd import Variable
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+net = R2Plus1D_model.R2Plus1DClassifier(2, (2, 2, 2, 2), pretrained=True).to(device)
+
+video_id = '2.mp4'
 
 filename = config.test_dir + video_id
 capture = cv2.VideoCapture(filename)
 video_max_len = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+capture.release()
 vid = imageio.get_reader(filename, 'ffmpeg')
 test_start = 0
 test_end = video_max_len
 
+anomaly_graph = []
+f = open('check_video_2.txt', 'w')
+
+start_time = time.time()
 for frame_start in range(test_start, test_end, config.test_video_step):
+    if (frame_start + 150 > test_end):
+        break
+    frame_start_time = time.time()
     video_segment = []
     for i in range(0, 15):
         video_segment.append([])
@@ -27,7 +42,7 @@ for frame_start in range(test_start, test_end, config.test_video_step):
                 y2 = y1 + config.prepare_crop_size[1]
                 if (x2 > config.video_size[0] or y2 > config.video_size[1]):
                     break
-                print(x1, ' ', y1,' ', x2,' ', y2)
+                #print(x1, ' ', y1,' ', x2,' ', y2)
                 temp_rgb = rgb[y1: y2, x1: x2, :]
                 temp_rgb = cv2.resize(temp_rgb, (config.crop_size, config.crop_size))
                 temp_rgb = np.swapaxes(temp_rgb, 1, 2)
@@ -35,10 +50,44 @@ for frame_start in range(test_start, test_end, config.test_video_step):
                 video_segment[segment_id].append(temp_rgb)
                 segment_id += 1
 
-    video_segment = np.array(video_segment)
+    video_segment = np.array(video_segment, dtype=np.float32)
     video_segment = np.swapaxes(video_segment, 1, 2)
     print(np.shape(video_segment))
-    break
+    # inputs = Variable(torch.from_numpy(video_segment), requires_grad=True).to(device)
+    # outputs = net(inputs)
+    # print(outputs.size())
+    # break
+    c_potential = 0
+    s_potential = 0
+    outputs = []
+    for i in range(0, 15):
+        inputs = Variable(torch.from_numpy(np.array([video_segment[i]], dtype=np.float32)), requires_grad=False).to(device)
+        output = net(inputs)
+        probs = torch.nn.Softmax(dim=1)(output)
+        output = probs.cpu().detach().numpy()[0]
+        outputs.append(output)
+
+    for i in range(0, 15):
+        if outputs[i][1] > 0.7:
+            s_potential += outputs[i][1]
+            c_potential += 1
+    
+    if (c_potential > 0):
+        anomaly_graph.append(s_potential/c_potential)
+    else:
+        anomaly_graph.append(0)
+
+    f.write(str(anomaly_graph[-1]) + '\n')
+
+    print(anomaly_graph[-1])
+    print('frame finish time: ', time.time() - frame_start_time)
+    print(outputs)
+
+duration = time.time() - start_time    
+print('execution time:', duration)
+f.close()
+plt.plot(anomaly_graph)
+plt.show()
 
 # inputs = torch.rand(1, 3, 16, 112, 112)
 # net = R2Plus1D_model.R2Plus1DClassifier(101, (2, 2, 2, 2), pretrained=False)

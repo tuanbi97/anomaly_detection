@@ -26,3 +26,4 @@ crop_size = 112
 test_dir='/media/tuanbi97/Vesty/Datasets/aic19-track3-test-data/'
 test_video_step = 150
 test_frame_step = [160, 125]
+model_dir='run/run_10/models/R2Plus1D-aicity_epoch-37.pth.tar'
