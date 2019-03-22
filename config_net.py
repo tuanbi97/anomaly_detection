@@ -6,7 +6,8 @@ def db_dir(dataset = 'aicity'):
     
     return root_dir, output_dir
 
-prepare_cropped_vehicles = '/media/tuanbi97/APCS/Thesis/Codes/VestyCity/data/cropped_vehices'
+dataname = 'AiCity.hdf5'
+prepare_cropped_vehicles = '/media/tuanbi97/Tuanbi97/APCS/Thesis/Codes/VestyCity/data/cropped_vehicles'
 prepare_train_dir = '/media/tuanbi97/Tuanbi97/APCS/Thesis/Codes/VestyCity/data/train'
 prepare_test_dir = '/media/tuanbi97/Tuanbi97/APCS/Thesis/Codes/VestyCity/data/test'
 prepare_hdf5_dir = '/media/tuanbi97/Tuanbi97/APCS/Thesis/Codes/VestyCity/data'
@@ -16,11 +17,15 @@ prepare_len_sample = 30
 prepare_video_max_len = 26000
 video_size = [800, 410]
 video_fps = 30
-# resize_w = 160
-# resize_h = 160
-resize_h = 128
-resize_w = 171
+resize_w = 160
+resize_h = 160
+# resize_h = 128
+# resize_w = 171
+resized_shape = [171, 128]
 crop_size = 112
+
+#train
+batch_size = 2
 
 
 #test

@@ -87,7 +87,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     writer = SummaryWriter(log_dir=log_dir)
 
     print('Training model on {} dataset...'.format(dataset))
-    train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, split='train'), batch_size=2, shuffle=True, num_workers=1)
+    train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, split='train'), batch_size=config.batch_size, shuffle=True, num_workers=1)
 
     for epoch in range(resume_epoch, num_epochs):
         # each epoch has a training and validation step
