@@ -87,9 +87,10 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     writer = SummaryWriter(log_dir=log_dir)
 
     print('Training model on {} dataset...'.format(dataset))
-    train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, split='train'), batch_size=1, shuffle=False, num_workers=1)
+    train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset), batch_size=1, shuffle=False, num_workers=1)
 
     for epoch in range(resume_epoch, num_epochs):
+        print('Training epoch: ', epoch)
         # each epoch has a training and validation step
         for phase in ['train']:
             start_time = timeit.default_timer()
@@ -110,10 +111,10 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
             total_step = 0
             for inputs, labels in train_dataloader:
                 optimizer.zero_grad()
-                batch_size = len(inputs)
-                for i in range(0, len(inputs)):
-                    input = torch.from_numpy(np.array([inputs[i]]))
-                    label = torch.from_numpy(np.array([labels[i]]))
+                batch_size = len(inputs[0])
+                for i in range(0, len(inputs[0])):
+                    input = inputs[0][i].unsqueeze(0)
+                    label = labels[0][i].unsqueeze(0)
                     input = Variable(input, requires_grad = True).to(device)
                     label = Variable(label).to(device)
 

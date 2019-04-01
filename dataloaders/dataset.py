@@ -339,12 +339,12 @@ class VideoDataset(Dataset):
     
         capture.release()
 
-        batch = np.array(batch)
+        batch = np.array(batch, dtype=np.float32)
         #num_region x len_interval x cropped_h x cropped_w x channels -> num_region x channels x len_interval x cropped_h x cropped_w
         batch = np.swapaxes(batch, 3, 4)
         batch = np.swapaxes(batch, 2, 3)
         batch = np.swapaxes(batch, 1, 2)
-        labels = np.array(labels)
+        labels = np.array(labels, dtype=np.int64)
         # video_segment = batch
         # for i in range(0, len(video_segment)):
         #     processed_vid = video_segment[i].astype(int)
