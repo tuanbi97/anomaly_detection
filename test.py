@@ -6,20 +6,20 @@ import cv2
 import numpy as np
 import time
 import matplotlib.pyplot as plt
-
+import matplotlib.animation as animation
 from torch.autograd import Variable
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 net = R2Plus1D_model.R2Plus1DClassifier(2, (2, 2, 2, 2), pretrained=True).to(device)
 
-video_id = '2.mp4'
+video_id = '93.mp4'
 
 filename = config.test_dir + video_id
 capture = cv2.VideoCapture(filename)
 video_max_len = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
 capture.release()
 vid = imageio.get_reader(filename, 'ffmpeg')
-test_start = 0
+test_start = 4 * 60 * config.video_fps
 test_end = video_max_len
 
 anomaly_graph = []
@@ -27,14 +27,15 @@ f = open('check_video_2.txt', 'w')
 
 start_time = time.time()
 for frame_start in range(test_start, test_end, config.test_video_step):
-    if (frame_start + 150 > test_end):
+    if (frame_start + config.prepare_len > test_end):
         break
     frame_start_time = time.time()
     video_segment = []
     for i in range(0, 15):
         video_segment.append([])
-    for i in range(0, 150, 5):
+    for i in range(0, config.prepare_len, config.prepare_len//config.prepare_len_sample):
         rgb = vid.get_data(frame_start + i)
+
         segment_id = 0
         for x1 in range(0, config.video_size[0], config.test_frame_step[0]):
             for y1 in range(0, config.video_size[1], config.test_frame_step[1]):
@@ -47,12 +48,23 @@ for frame_start in range(test_start, test_end, config.test_video_step):
                 temp_rgb = cv2.resize(temp_rgb, (config.crop_size, config.crop_size))
                 temp_rgb = np.swapaxes(temp_rgb, 1, 2)
                 temp_rgb = np.swapaxes(temp_rgb, 0, 1)
+
                 video_segment[segment_id].append(temp_rgb)
                 segment_id += 1
 
     video_segment = np.array(video_segment, dtype=np.float32)
     video_segment = np.swapaxes(video_segment, 1, 2)
     print(np.shape(video_segment))
+    #debug
+    for i in range(0, len(video_segment)):
+        processed_vid = video_segment[i].astype(int)
+        fig = plt.figure()
+        ims = []
+        for ii in range(0, np.shape(processed_vid)[1]):
+            im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
+            ims.append([im])
+        ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
+        plt.show()
     # inputs = Variable(torch.from_numpy(video_segment), requires_grad=True).to(device)
     # outputs = net(inputs)
     # print(outputs.size())
@@ -60,12 +72,26 @@ for frame_start in range(test_start, test_end, config.test_video_step):
     c_potential = 0
     s_potential = 0
     outputs = []
+
+    xticks = [x for x in range(0, config.video_size[0] - config.prepare_crop_size[0] + 1, config.test_frame_step[0])]
+    yticks = [y for y in range(0, config.video_size[1] - config.prepare_crop_size[1] + 1, config.test_frame_step[1])]
+    hm = np.zeros([3, 5])
     for i in range(0, 15):
         inputs = Variable(torch.from_numpy(np.array([video_segment[i]], dtype=np.float32)), requires_grad=False).to(device)
         output = net(inputs)
         probs = torch.nn.Softmax(dim=1)(output)
         output = probs.cpu().detach().numpy()[0]
         outputs.append(output)
+        hm[i % 3][i // 3] = output[1]
+
+    #show heat map
+    fig, ax = plt.subplots()
+    im = ax.imshow(hm)
+    ax.set_xticks([0, 1, 2, 3, 4])
+    ax.set_yticks([0, 1, 2])
+    ax.set_xticklabels(xticks)
+    ax.set_yticklabels(yticks)
+    plt.show()
 
     for i in range(0, 15):
         if outputs[i][1] > 0.7:

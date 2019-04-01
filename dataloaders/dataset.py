@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import imageio
 import h5py
+import random
 
 class VideoDataset(Dataset):
     def __init__(self, config, dataset='aicity', split='train', preprocess=False):
@@ -44,7 +45,7 @@ class VideoDataset(Dataset):
         crop_size = config.prepare_crop_size
         #prepare_train
         #get 1000 normal samples from abnormal videos
-        for i in range(0, 500):
+        for i in range(0, 1000):
             video_id = anomaly_videos[np.random.randint(0, len(anomaly_videos), 1)[0]]
             print(video_id)
 
@@ -118,7 +119,7 @@ class VideoDataset(Dataset):
             # print('finish')
 
         #get 2000 normal samples from normal videos
-        for i in range(500, 2000):
+        for i in range(1000, 3000):
             video_id = normal_videos[np.random.randint(0, len(normal_videos), 1)[0]]
 
             filename = self.root_dir + '/' + str(video_id) + '.mp4'
@@ -154,8 +155,8 @@ class VideoDataset(Dataset):
     def prepare_anomaly(self, config, dataset, anomaly_videos, normal_videos, raw_set):
         
         #prepare_train
-        #get 3000 anomaly samples from abnormal videos
-        for i in range(0, 2000):
+        #get 1000 anomaly samples from abnormal videos
+        for i in range(0, 1000):
             video_id = anomaly_videos[np.random.randint(0, len(anomaly_videos), 1)[0]]
 
             filename = self.root_dir + '/' + str(video_id) + '.mp4'
@@ -236,10 +237,10 @@ class VideoDataset(Dataset):
         normal_videos = list(set(range(1, 101)) - set(anomaly_videos))
 
         #create dataset
-        hdf5_dataset = h5py.File(config.prepare_hdf5_dir + '/AiCity.hdf5', 'w')
+        hdf5_dataset = h5py.File(config.prepare_hdf5_dir + '/' + config.dataname, 'w')
         train_set = hdf5_dataset.create_group('train')
-        train_set.attrs['normal_length'] = 2000
-        train_set.attrs['anomaly_length'] = 2000
+        train_set.attrs['normal_length'] = 3000
+        train_set.attrs['anomaly_length'] = 1000
         normal_set = train_set.create_group('normal')
         anomaly_set = train_set.create_group('anomaly')
 
@@ -247,6 +248,24 @@ class VideoDataset(Dataset):
         self.prepare_anomaly(config, anomaly_set, anomaly_videos, normal_videos, raw_set)
 
         hdf5_dataset.close()
+
+    def loadRandomCroppedVehicle(self, augmented_path):
+        paths = os.listdir(augmented_path)
+        index = random.randint(0, len(paths) - 1)
+        #print(paths[index])
+        vehicle = cv2.cvtColor(cv2.imread(augmented_path + '/' + paths[index]), cv2.COLOR_BGR2RGB)
+        return vehicle
+
+    def mergeAugmentedVehicle(self, augmented_vehicle, buffer, posx, posy):
+        lx = max(posx, 0)
+        rx = min(posx + augmented_vehicle.shape[1], buffer.shape[1])
+        ly = max(posy, 0)
+        ry = min(posy + augmented_vehicle.shape[0], buffer.shape[0])
+        for j in range(lx, rx):
+            for i in range(ly, ry):
+                if augmented_vehicle[i - posy][j - posx] > 0:
+                    buffer[i][j] = augmented_vehicle[i - posy][j - posx]
+        return buffer
 
     def __len__(self):
         return self.dataset['train'].attrs['normal_length'] + self.dataset['train'].attrs['anomaly_length']
@@ -260,15 +279,49 @@ class VideoDataset(Dataset):
             set_name = 'anomaly'
             set_id = index - self.dataset['train'].attrs['normal_length']
 
+        turnToAnomaly = random.randint(0, 2)
+        #turnToAnomaly = 1
         buffer = np.array(self.dataset['train/' + set_name + '/' + str(set_id)][()], dtype=np.dtype('float32'))
+        label = self.dataset['train/' + set_name + '/' + str(set_id)].attrs['anomaly']
+        if set_name == 'normal' and turnToAnomaly == 2:
+            augmented_vehicle = self.loadRandomCroppedVehicle(self.config.prepare_cropped_vehicles)
+
+            #random resize
+            scale = random.uniform(0.8, 2)
+            h, w, _ = augmented_vehicle.shape
+            augmented_vehicle = cv2.resize(augmented_vehicle, (int(w * scale), int(h * scale)))
+            #random place
+            # posx = random.randint(-augmented_vehicle.shape[1]//2, self.config.prepare_crop_size[0] - augmented_vehicle.shape[1] // 2)
+            # posy = random.randint(-augmented_vehicle.shape[0]//2, self.config.prepare_crop_size[1] - augmented_vehicle.shape[0] // 2)
+            posx = random.randint(0, self.config.resized_shape[0] - augmented_vehicle.shape[1])
+            posy = random.randint(0, self.config.resized_shape[1] - augmented_vehicle.shape[0])
+            # print(posx, ' ', posy)
+            # print('vehicle size: ', augmented_vehicle.shape)
+            for i in range(0, 3):
+                for j in range(0, self.config.prepare_len_sample):
+                    buffer[i][j] = self.mergeAugmentedVehicle(augmented_vehicle[:, :, i], buffer[i][j], posx, posy)
+
+            # processed_vid = buffer.astype(int)
+            # fig = plt.figure()
+            # ims = []
+            # for ii in range(0, np.shape(processed_vid)[1]):
+            #     im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
+            #     ims.append([im])
+            # ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
+            # plt.show()
+            
+            box1 = [0, 0, self.config.prepare_crop_size[0], self.config.prepare_crop_size[1]]
+            box2 = [posx, posy, posx + augmented_vehicle.shape[1], posy + augmented_vehicle.shape[0]]
+            #soft assign label
+            #label = 1.0 * self.box_intersect(box1, box2) / (1.0 * augmented_vehicle.shape[0] * augmented_vehicle.shape[1])
+            label = 1
+            #print(label)
+        
         temp = [[], [], []]
         for i in range(0, 3):
-            for j in range(0, 30):
-                temp[i].append(cv2.resize(buffer[i][j], (self.config.crop_size, self.config.crop_size)))
-
+            for j in range(0, self.config.prepare_len_sample):
+                temp[i].append(cv2.resize(buffer[i][j], (self.config.crop_size, self.config.crop_size)))   
         buffer = np.array(temp)
-
-        label = self.dataset['train/' + set_name + '/' + str(set_id)].attrs['anomaly']
         # one_hot_label = np.zeros([2], dtype=int)
         # one_hot_label[label] = 1
         return torch.from_numpy(buffer), torch.from_numpy(np.array(label))
