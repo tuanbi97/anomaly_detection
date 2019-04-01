@@ -9,7 +9,7 @@ from tensorboardX import SummaryWriter
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
-
+import numpy as np
 from dataloaders.dataset import VideoDataset
 # from network import C3D_model, R2Plus1D_model, R3D_model
 from network import R2Plus1D_model
@@ -87,7 +87,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     writer = SummaryWriter(log_dir=log_dir)
 
     print('Training model on {} dataset...'.format(dataset))
-    train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, split='train'), batch_size=config.batch_size, shuffle=True, num_workers=1)
+    train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, split='train'), batch_size=1, shuffle=False, num_workers=1)
 
     for epoch in range(resume_epoch, num_epochs):
         # each epoch has a training and validation step
@@ -107,28 +107,35 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
             else:
                 model.eval()
 
+            total_step = 0
             for inputs, labels in train_dataloader:
-                # move inputs and labels to the device the training is taking place on
-                inputs = Variable(inputs, requires_grad=True).to(device)
-                labels = Variable(labels).to(device)
                 optimizer.zero_grad()
+                batch_size = len(inputs)
+                for i in range(0, len(inputs)):
+                    input = torch.from_numpy(np.array([inputs[i]]))
+                    label = torch.from_numpy(np.array([labels[i]]))
+                    input = Variable(input, requires_grad = True).to(device)
+                    label = Variable(label).to(device)
 
+                    if phase == 'train':
+                        outputs = model(input)
+
+                    probs = nn.Softmax(dim=1)(outputs)
+                    preds = torch.max(probs, 1)[1]
+                    loss = criterion(outputs, label)
+
+                    if phase == 'train':
+                        loss.backward()
+
+                    running_loss += loss.item()
+                    running_corrects += torch.sum(preds == label.data)
+                    total_step += 1
+                
                 if phase == 'train':
-                    outputs = model(inputs)
-
-                probs = nn.Softmax(dim=1)(outputs)
-                preds = torch.max(probs, 1)[1]
-                loss = criterion(outputs, labels)
-
-                if phase == 'train':
-                    loss.backward()
                     optimizer.step()
 
-                running_loss += loss.item() * inputs.size(0)
-                running_corrects += torch.sum(preds == labels.data)
-
-            epoch_loss = running_loss / len(train_dataloader.dataset)
-            epoch_acc = running_corrects.double() / len(train_dataloader.dataset)
+            epoch_loss = running_loss / total_step
+            epoch_acc = running_corrects.double() / total_step
 
             if phase == 'train':
                 writer.add_scalar('data/train_loss_epoch', epoch_loss, epoch)

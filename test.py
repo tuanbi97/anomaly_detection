@@ -11,15 +11,18 @@ from torch.autograd import Variable
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 net = R2Plus1D_model.R2Plus1DClassifier(2, (2, 2, 2, 2), pretrained=True).to(device)
+net.eval()
 
-video_id = '93.mp4'
+video_id = '2.mp4'
 
 filename = config.test_dir + video_id
 capture = cv2.VideoCapture(filename)
 video_max_len = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
 capture.release()
 vid = imageio.get_reader(filename, 'ffmpeg')
-test_start = 4 * 60 * config.video_fps
+# test_start = 4 * 60 * config.video_fps
+# test_end = video_max_len
+test_start = 0
 test_end = video_max_len
 
 anomaly_graph = []
@@ -55,16 +58,18 @@ for frame_start in range(test_start, test_end, config.test_video_step):
     video_segment = np.array(video_segment, dtype=np.float32)
     video_segment = np.swapaxes(video_segment, 1, 2)
     print(np.shape(video_segment))
+    
     #debug
-    for i in range(0, len(video_segment)):
-        processed_vid = video_segment[i].astype(int)
-        fig = plt.figure()
-        ims = []
-        for ii in range(0, np.shape(processed_vid)[1]):
-            im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
-            ims.append([im])
-        ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
-        plt.show()
+    # for i in range(0, len(video_segment)):
+    #     processed_vid = video_segment[i].astype(int)
+    #     fig = plt.figure()
+    #     ims = []
+    #     for ii in range(0, np.shape(processed_vid)[1]):
+    #         im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
+    #         ims.append([im])
+    #     ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
+    #     plt.show()
+    
     # inputs = Variable(torch.from_numpy(video_segment), requires_grad=True).to(device)
     # outputs = net(inputs)
     # print(outputs.size())
@@ -85,13 +90,13 @@ for frame_start in range(test_start, test_end, config.test_video_step):
         hm[i % 3][i // 3] = output[1]
 
     #show heat map
-    fig, ax = plt.subplots()
-    im = ax.imshow(hm)
-    ax.set_xticks([0, 1, 2, 3, 4])
-    ax.set_yticks([0, 1, 2])
-    ax.set_xticklabels(xticks)
-    ax.set_yticklabels(yticks)
-    plt.show()
+    # fig, ax = plt.subplots()
+    # im = ax.imshow(hm)
+    # ax.set_xticks([0, 1, 2, 3, 4])
+    # ax.set_yticks([0, 1, 2])
+    # ax.set_xticklabels(xticks)
+    # ax.set_yticklabels(yticks)
+    # plt.show()
 
     for i in range(0, 15):
         if outputs[i][1] > 0.7:

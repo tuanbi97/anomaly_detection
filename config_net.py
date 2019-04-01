@@ -19,13 +19,15 @@ video_size = [800, 410]
 video_fps = 30
 resize_w = 160
 resize_h = 160
-# resize_h = 128
-# resize_w = 171
-resized_shape = [171, 128]
+#resized_shape = [171, 128]
+resized_shape = (112, 112)
 crop_size = 112
 
 #train
 batch_size = 2
+step_per_epoch = 100
+step_w = 80
+step_h = 125
 
 
 #test
