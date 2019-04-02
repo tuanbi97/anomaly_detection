@@ -54,6 +54,7 @@ class TestDataset(Dataset):
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = R2Plus1D_model.R2Plus1DClassifier(2, (2, 2, 2, 2), pretrained=True).to(device)
+model.eval()
 
 data = 'data/AiCity2.hdf5'
 test_dataloader = DataLoader(TestDataset(), batch_size=1, shuffle=False, num_workers=1)

@@ -7,6 +7,7 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import seaborn as sns
 from torch.autograd import Variable
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -94,6 +95,10 @@ for frame_start in range(test_start, test_end, config.test_video_step):
     # im = ax.imshow(hm)
     # ax.set_xticks([0, 1, 2, 3, 4])
     # ax.set_yticks([0, 1, 2])
+    # ax.set_xticklabels(xticks)
+    # ax.set_yticklabels(yticks)
+    # plt.show()
+    # ax = sns.heatmap(hm, vmin=0, vmax=1, annot=True)
     # ax.set_xticklabels(xticks)
     # ax.set_yticklabels(yticks)
     # plt.show()
