@@ -129,12 +129,13 @@ for frame_start in range(test_start, test_end, config.test_video_step):
     f.write(str(anomaly_graph[-1]) + '\n')
 
     print(anomaly_graph[-1])
-    print('frame finish time: ', time.time() - frame_start_time)
-    print(outputs)
+    #print('frame finish time: ', time.time() - frame_start_time)
+    #print(outputs)
 
 duration = time.time() - start_time    
 print('execution time:', duration)
 f.close()
+%matplotlib notebook
 plt.plot(anomaly_graph)
 plt.show()
 
