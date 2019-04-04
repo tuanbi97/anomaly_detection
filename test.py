@@ -114,7 +114,7 @@ for frame_start in range(test_start, test_end, config.test_video_step):
     ax.set_yticks([0, 1, 2])
     ax.set_xticklabels(xticks)
     ax.set_yticklabels(yticks)
-    plt.show()
+    # plt.show()
 
     for i in range(0, 15):
         if outputs[i][1] > 0.7:
