@@ -29,7 +29,7 @@ batch_size = 2
 
 
 #test
-test_dir='/media/tuanbi97/Vesty/Datasets/aic19-track3-train-data/'
+test_dir='./../aic19-track3-train-data/'
 test_video_step = 150
 test_frame_step = [160, 125]
-model_dir='run/run_10/models/R2Plus1D-aicity_epoch-49.pth.tar'
+model_dir='./../Ex1/R2Plus1D-aicity_epoch-33.pth.tar'
