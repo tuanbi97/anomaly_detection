@@ -254,7 +254,7 @@ class R2Plus1DClassifier(nn.Module):
     def __load_pretrained_weights(self):
         p_dict = torch.load(config.model_dir)['state_dict']
         s_dict = self.state_dict()
-        for name in s_dict:
+        for name in p_dict:
             print(name)
             s_dict[name] = p_dict[name]
         self.load_state_dict(s_dict)
