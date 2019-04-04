@@ -9,6 +9,28 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from torch.autograd import Variable
 
+
+parser = argparse.ArgumentParser(description="PyTorch Object Detection Training")
+parser.add_argument(
+    '--test-dir',
+    dest='test_dir',
+    help='directory for visualization pdfs (default: /tmp/infer_simple)',
+    default='./../aic19-track3-train-data/',
+    type=str
+)
+parser.add_argument(
+    '--model-dir',
+    dest='model-dir',
+    help='directory for visualization pdfs (default: /tmp/infer_simple)',
+    default='./../Ex1/R2Plus1D-aicity_epoch-33.pth.tar',
+    type=str
+)
+
+args = parser.parse_args()
+config.model_dir = args.model_dir
+config.test_dir = args.test_dir
+
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 net = R2Plus1D_model.R2Plus1DClassifier(2, (2, 2, 2, 2), pretrained=True).to(device)
 
@@ -120,5 +142,3 @@ plt.show()
 
 # outputs = net.forward(inputs)
 # print(outputs.size())
-
-
