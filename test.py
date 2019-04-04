@@ -21,7 +21,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '--model-dir',
-    dest='model-dir',
+    dest='model_dir',
     help='directory for visualization pdfs (default: /tmp/infer_simple)',
     default='./../Ex1/R2Plus1D-aicity_epoch-33.pth.tar',
     type=str
