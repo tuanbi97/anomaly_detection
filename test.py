@@ -46,7 +46,7 @@ test_start = 4 * 60 * config.video_fps
 test_end = video_max_len
 
 anomaly_graph = []
-f = open('check_video_2.txt', 'w')
+f = open('check_video_2.txt', 'w+')
 
 start_time = time.time()
 for frame_start in range(test_start, test_end, config.test_video_step):
@@ -135,7 +135,6 @@ for frame_start in range(test_start, test_end, config.test_video_step):
 duration = time.time() - start_time    
 print('execution time:', duration)
 f.close()
-%matplotlib notebook
 plt.plot(anomaly_graph)
 plt.show()
 
