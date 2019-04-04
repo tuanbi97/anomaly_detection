@@ -30,7 +30,7 @@ parser.add_argument(
 args = parser.parse_args()
 config.model_dir = args.model_dir
 config.test_dir = args.test_dir
-
+print config.model_dir
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 net = R2Plus1D_model.R2Plus1DClassifier(2, (2, 2, 2, 2), pretrained=True).to(device)
