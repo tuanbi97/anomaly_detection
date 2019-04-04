@@ -87,7 +87,7 @@ for frame_start in range(test_start, test_end, config.test_video_step):
             im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
             ims.append([im])
         ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
-        plt.show()
+        #plt.show()
     # inputs = Variable(torch.from_numpy(video_segment), requires_grad=True).to(device)
     # outputs = net(inputs)
     # print(outputs.size())
