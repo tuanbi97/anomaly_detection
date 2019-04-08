@@ -270,7 +270,7 @@ class VideoDataset(Dataset):
                     label = 0
                 else:
                     ratio = self.box_intersect((x1, y1, x2, y2), (gt_x1, gt_y1, gt_x2, gt_y2)) / ((gt_x2 - gt_x1) * (gt_y2 - gt_y1))
-                    if ratio < 0.5:
+                    if ratio < 0.6:
                         label = 0
                     else:
                         label = 1
@@ -285,6 +285,7 @@ class VideoDataset(Dataset):
 
     def __getitem__(self, index):
         video_id = index + 1
+        # video_id = 93
         filename = self.root_dir + '/' + str(video_id) + '.mp4'
         #print(filename)
         capture = cv2.VideoCapture(filename)
@@ -336,6 +337,7 @@ class VideoDataset(Dataset):
         for cropped_region in cropped_regions:
             x1, y1, x2, y2 = cropped_region
             labels.append(self.checkLabel(video_id, l, r, x1, y1, x2, y2))
+            #labels.append(1)
     
         capture.release()
 
@@ -346,54 +348,55 @@ class VideoDataset(Dataset):
         batch = np.swapaxes(batch, 1, 2)
         labels = np.array(labels, dtype=np.int64)
 
-        # data augmentation
-        for k in range(0, batch.shape[0]):
-            turnToAnomaly = random.randint(0, 2)
-            if turnToAnomaly == 0:
-                buffer = batch[k]
-                augmented_vehicle = self.loadRandomCroppedVehicle(self.config.prepare_cropped_vehicles)
+        # data augmentation (optional)
+        # for k in range(0, batch.shape[0]):
+        #     turnToAnomaly = random.randint(0, 2)
+        #     if turnToAnomaly == 0:
+        #         buffer = batch[k]
+        #         augmented_vehicle = self.loadRandomCroppedVehicle(self.config.prepare_cropped_vehicles)
 
-                #random resize
-                scale = random.uniform(0.5, 1.5)
-                h, w, _ = augmented_vehicle.shape
-                augmented_vehicle = cv2.resize(augmented_vehicle, (int(w * scale), int(h * scale)))
-                #random place
-                # posx = random.randint(-augmented_vehicle.shape[1]//2, self.config.prepare_crop_size[0] - augmented_vehicle.shape[1] // 2)
-                # posy = random.randint(-augmented_vehicle.shape[0]//2, self.config.prepare_crop_size[1] - augmented_vehicle.shape[0] // 2)
-                posx = random.randint(0, self.config.resized_shape[0] - augmented_vehicle.shape[1])
-                posy = random.randint(0, self.config.resized_shape[1] - augmented_vehicle.shape[0])
-                # print(posx, ' ', posy)
-                # print('vehicle size: ', augmented_vehicle.shape)
-                for i in range(0, 3):
-                    for j in range(0, self.config.prepare_len_sample):
-                        buffer[i][j] = self.mergeAugmentedVehicle(augmented_vehicle[:, :, i], buffer[i][j], posx, posy)
+        #         #random resize
+        #         scale = random.uniform(0.5, 1.5)
+        #         h, w, _ = augmented_vehicle.shape
+        #         augmented_vehicle = cv2.resize(augmented_vehicle, (int(w * scale), int(h * scale)))
+        #         #random place
+        #         # posx = random.randint(-augmented_vehicle.shape[1]//2, self.config.prepare_crop_size[0] - augmented_vehicle.shape[1] // 2)
+        #         # posy = random.randint(-augmented_vehicle.shape[0]//2, self.config.prepare_crop_size[1] - augmented_vehicle.shape[0] // 2)
+        #         posx = random.randint(0, self.config.resized_shape[0] - augmented_vehicle.shape[1])
+        #         posy = random.randint(0, self.config.resized_shape[1] - augmented_vehicle.shape[0])
+        #         # print(posx, ' ', posy)
+        #         # print('vehicle size: ', augmented_vehicle.shape)
+        #         for i in range(0, 3):
+        #             for j in range(0, self.config.prepare_len_sample):
+        #                 buffer[i][j] = self.mergeAugmentedVehicle(augmented_vehicle[:, :, i], buffer[i][j], posx, posy)
 
-                # processed_vid = batch[k].astype(int)
-                # fig = plt.figure()
-                # ims = []
-                # for ii in range(0, np.shape(processed_vid)[1]):
-                #     im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
-                #     ims.append([im])
-                # ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
-                # plt.show()
+        #         # processed_vid = batch[k].astype(int)
+        #         # fig = plt.figure()
+        #         # ims = []
+        #         # for ii in range(0, np.shape(processed_vid)[1]):
+        #         #     im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
+        #         #     ims.append([im])
+        #         # ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
+        #         # plt.show()
                 
-                box1 = [0, 0, self.config.prepare_crop_size[0], self.config.prepare_crop_size[1]]
-                box2 = [posx, posy, posx + augmented_vehicle.shape[1], posy + augmented_vehicle.shape[0]]
-                #soft assign label
-                #label = 1.0 * self.box_intersect(box1, box2) / (1.0 * augmented_vehicle.shape[0] * augmented_vehicle.shape[1])
-                labels[k] = 1
+        #         box1 = [0, 0, self.config.prepare_crop_size[0], self.config.prepare_crop_size[1]]
+        #         box2 = [posx, posy, posx + augmented_vehicle.shape[1], posy + augmented_vehicle.shape[0]]
+        #         #soft assign label
+        #         #label = 1.0 * self.box_intersect(box1, box2) / (1.0 * augmented_vehicle.shape[0] * augmented_vehicle.shape[1])
+        #         labels[k] = 1
 
-        # video_segment = batch
-        # for i in range(0, len(video_segment)):
-        #     processed_vid = video_segment[i].astype(int)
-        #     fig = plt.figure()
-        #     ims = []
-        #     for ii in range(0, np.shape(processed_vid)[1]):
-        #         im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
-        #         ims.append([im])
-        #     ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
-        #     plt.show()
-        # print(batch.shape, ' ', labels.shape)
+        # # video_segment = batch
+        # # for i in range(0, len(video_segment)):
+        # #     processed_vid = video_segment[i].astype(int)
+        # #     print(labels[i])
+        # #     fig = plt.figure()
+        # #     ims = []
+        # #     for ii in range(0, np.shape(processed_vid)[1]):
+        # #         im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
+        # #         ims.append([im])
+        # #     ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
+        # #     plt.show()
+        # # print(batch.shape, ' ', labels.shape)
         return batch, labels
 
 if __name__ == "__main__":

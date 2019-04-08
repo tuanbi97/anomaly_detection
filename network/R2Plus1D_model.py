@@ -263,12 +263,12 @@ class R2Plus1DClassifier(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
                 # n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                # m.weight.data.normal_(0, math.sqrt(2. / n))
+                # m.weight.data.normal_(0, 0.01)
                 nn.init.kaiming_normal_(m.weight)
-            elif isinstance(m, nn.BatchNorm3d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
-
+            else:
+                if isinstance(m, nn.BatchNorm3d):
+                    m.weight.data.fill_(1)
+                    m.bias.data.zero_()
 
 def get_1x_lr_params(model):
     """

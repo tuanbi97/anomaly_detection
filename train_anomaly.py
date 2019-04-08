@@ -14,6 +14,7 @@ from dataloaders.dataset import VideoDataset
 # from network import C3D_model, R2Plus1D_model, R3D_model
 from network import R2Plus1D_model
 import config_net as config
+from focalloss import FocalLoss
 
 # Use GPU if available else revert to CPU
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -21,8 +22,8 @@ print("Device being used:", device)
 
 nEpochs = 100  # Number of epochs for training
 resume_epoch = 0  # Default is 0, change if want to resume
-snapshot = 2 # Store a model every snapshot epochs
-lr = 1e-3 # Learning rate
+snapshot = 3 # Store a model every snapshot epochs
+lr = 1e-6 # Learning rate
 
 dataset = 'aicity' #ai city dataset
 
@@ -65,19 +66,21 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
         print('We only implemented C3D and R2Plus1D models.')
         raise NotImplementedError
     criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
+    #criterion = FocalLoss(device=device, gamma=1)
     optimizer = optim.SGD(train_params, lr=lr, momentum=0.9, weight_decay=5e-4)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10,
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=40,
                                           gamma=0.1)  # the scheduler divides the lr by 10 every 10 epochs
 
     if resume_epoch == 0:
         print("Training {} from scratch...".format(modelName))
     else:
+        print(os.path.join(save_dir, 'models', saveName + '_epoch-' + str(resume_epoch - 1) + '.pth.tar'))
         checkpoint = torch.load(os.path.join(save_dir, 'models', saveName + '_epoch-' + str(resume_epoch - 1) + '.pth.tar'),
                        map_location=lambda storage, loc: storage)   # Load all tensors onto the CPU
         print("Initializing weights from: {}...".format(
             os.path.join(save_dir, 'models', saveName + '_epoch-' + str(resume_epoch - 1) + '.pth.tar')))
         model.load_state_dict(checkpoint['state_dict'])
-        optimizer.load_state_dict(checkpoint['opt_dict'])
+        # optimizer.load_state_dict(checkpoint['opt_dict'])
 
     print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters()) / 1000000.0))
     model.to(device)
@@ -87,7 +90,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     writer = SummaryWriter(log_dir=log_dir)
 
     print('Training model on {} dataset...'.format(dataset))
-    train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset), batch_size=1, shuffle=False, num_workers=1)
+    train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset), batch_size=1, shuffle=True, num_workers=1)
 
     for epoch in range(resume_epoch, num_epochs):
         print('Training epoch: ', epoch)
@@ -109,6 +112,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                 model.eval()
 
             total_step = 0
+            total_loss = 0
             for inputs, labels in train_dataloader:
                 optimizer.zero_grad()
                 batch_size = len(inputs[0])
@@ -117,16 +121,23 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                     label = labels[0][i].unsqueeze(0)
                     input = Variable(input, requires_grad = True).to(device)
                     label = Variable(label).to(device)
+                    
 
                     if phase == 'train':
                         outputs = model(input)
 
+                    print('output: ', outputs)
                     probs = nn.Softmax(dim=1)(outputs)
+                    print('softmax: ', probs)
                     preds = torch.max(probs, 1)[1]
                     loss = criterion(outputs, label)
 
+                    # if (label[0] == 1):
+                    #     loss *= 8
+
                     if phase == 'train':
                         loss.backward()
+                        #optimizer.step()
 
                     running_loss += loss.item()
                     running_corrects += torch.sum(preds == label.data)
