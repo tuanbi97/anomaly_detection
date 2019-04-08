@@ -285,7 +285,7 @@ class VideoDataset(Dataset):
 
     def __getitem__(self, index):
         video_id = index + 1
-        # video_id = 93
+        video_id = 93
         filename = self.root_dir + '/' + str(video_id) + '.mp4'
         #print(filename)
         capture = cv2.VideoCapture(filename)

@@ -14,7 +14,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 net = R2Plus1D_model.R2Plus1DClassifier(2, (2, 2, 2, 2), pretrained=True).to(device)
 net.eval()
 
-video_id = '93.mp4'
+video_id = '2.mp4'
 
 filename = config.test_dir + video_id
 capture = cv2.VideoCapture(filename)
@@ -27,7 +27,7 @@ test_start = 0
 test_end = video_max_len
 
 anomaly_graph = []
-f = open('check_video_93.txt', 'w')
+f = open('check_video_2.txt', 'w')
 
 start_time = time.time()
 for frame_start in range(test_start, test_end, config.test_video_step):

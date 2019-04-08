@@ -23,7 +23,7 @@ print("Device being used:", device)
 nEpochs = 100  # Number of epochs for training
 resume_epoch = 0  # Default is 0, change if want to resume
 snapshot = 3 # Store a model every snapshot epochs
-lr = 1e-6 # Learning rate
+lr = 1e-5 # Learning rate
 
 dataset = 'aicity' #ai city dataset
 
@@ -65,10 +65,10 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     else:
         print('We only implemented C3D and R2Plus1D models.')
         raise NotImplementedError
-    criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
-    #criterion = FocalLoss(device=device, gamma=1)
+    #criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
+    criterion = FocalLoss(device=device, gamma=2)
     optimizer = optim.SGD(train_params, lr=lr, momentum=0.9, weight_decay=5e-4)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=40,
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100,
                                           gamma=0.1)  # the scheduler divides the lr by 10 every 10 epochs
 
     if resume_epoch == 0:
@@ -114,9 +114,10 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
             total_step = 0
             total_loss = 0
             for inputs, labels in train_dataloader:
-                optimizer.zero_grad()
+                
                 batch_size = len(inputs[0])
                 for i in range(0, len(inputs[0])):
+                    optimizer.zero_grad()
                     input = inputs[0][i].unsqueeze(0)
                     label = labels[0][i].unsqueeze(0)
                     input = Variable(input, requires_grad = True).to(device)
@@ -126,26 +127,29 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                     if phase == 'train':
                         outputs = model(input)
 
+                    print(label)
                     print('output: ', outputs)
                     probs = nn.Softmax(dim=1)(outputs)
                     print('softmax: ', probs)
                     preds = torch.max(probs, 1)[1]
                     loss = criterion(outputs, label)
+                    print('loss: ', loss.item())
 
                     # if (label[0] == 1):
                     #     loss *= 8
 
                     if phase == 'train':
                         loss.backward()
-                        #optimizer.step()
+                        optimizer.step()
 
                     running_loss += loss.item()
                     running_corrects += torch.sum(preds == label.data)
                     total_step += 1
                 
-                if phase == 'train':
-                    optimizer.step()
+                # if phase == 'train':
+                #     optimizer.step()
 
+            print(running_loss, ' ', total_step)
             epoch_loss = running_loss / total_step
             epoch_acc = running_corrects.double() / total_step
 
