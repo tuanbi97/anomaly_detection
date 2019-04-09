@@ -350,7 +350,7 @@ class VideoDataset(Dataset):
             batch = np.swapaxes(batch, 2, 3)
             batch = np.swapaxes(batch, 1, 2)
             batch = np.swapaxes(batch, 0, 1)
-            labels = np.array([label], dtype=np.int64)
+            labels = label
         return batch, labels
 
 if __name__ == "__main__":

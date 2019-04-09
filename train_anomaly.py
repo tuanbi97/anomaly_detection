@@ -160,10 +160,10 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                     
                     probs = nn.Softmax(dim=1)(outputs)
                     preds = torch.max(probs, 1)[1]
-                    loss = criterion(outputs, label)
+                    loss = criterion(outputs, labels)
 
                     running_loss += loss.item() * inputs.size(0)
-                    running_corrects += torch.sum(preds == label.data)
+                    running_corrects += torch.sum(preds == labels.data)
                     total_step += 1
 
                 epoch_loss = running_loss / total_step
