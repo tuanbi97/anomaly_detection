@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import random
+import h5py
 
 class VideoDataset(Dataset):
     def __init__(self, config, dataset='aicity', preprocess=False):
@@ -16,6 +17,9 @@ class VideoDataset(Dataset):
         self.resize_width = 112
         self.config = config
         self.prepare_data()
+
+        if preprocess:
+            self.create_dataset()
         # processed_vid = self.dataset['train/anomaly/0'][()]
         # fig = plt.figure()
         # ims = []
@@ -41,170 +45,89 @@ class VideoDataset(Dataset):
             return 0
         return rmin - lmax
     
-    def prepare_normal(self, config, dataset, anomaly_videos, normal_videos, raw_set):
-        crop_size = config.prepare_crop_size
-        #prepare_train
-        #get 1000 normal samples from abnormal videos
-        for i in range(0, 1000):
-            video_id = anomaly_videos[np.random.randint(0, len(anomaly_videos), 1)[0]]
-            print(video_id)
-
-            l, r = raw_set[video_id][0] * config.video_fps, raw_set[video_id][1] * config.video_fps
-            anomaly_box = raw_set[video_id][2:6]
-            print(anomaly_box)
-
-            filename = self.root_dir + '/' + str(video_id) + '.mp4'
-            capture = cv2.VideoCapture(filename)
-            video_max_len = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-            vid = imageio.get_reader(filename, 'ffmpeg')
-
-            #find random normal interval
-            for j in range(0, 100):
-                is_anomaly = False
-                lt = np.random.randint(0, video_max_len, 1)[0]
-                if lt >= l:
-                    lt +=  r - l
-                    lt = min(lt, video_max_len - config.prepare_len)
-                rt = lt + config.prepare_len
-                if rt > video_max_len:
-                    is_anomaly = True
-                if lt < l and rt > l and 1.0 * (rt - l) / config.prepare_len >= 0.5:
-                    is_anomaly = True
-                if rt > r and lt < r and 1.0 * (r - lt) / config.prepare_len >= 0.5:
-                    is_anomaly = True
-                if l <= lt and rt <= r:
-                    is_anomaly = True
-                if is_anomaly == False:
-                    break
-
-            x1 = np.random.randint(0, config.video_size[0] - crop_size[0], 1)[0]
-            y1 = np.random.randint(0, config.video_size[1] - crop_size[1], 1)[0]
-            x2, y2 = np.array([x1, y1]) + np.array(crop_size)
-            while is_anomaly == True:
-                x1 = np.random.randint(0, config.video_size[0] - crop_size[0], 1)[0]
-                y1 = np.random.randint(0, config.video_size[1] - crop_size[1], 1)[0]
-                x2, y2 = np.array([x1, y1]) + np.array(crop_size)
-                intersect = self.box_intersect([x1, y1, x2, y2], anomaly_box)
-                if intersect == 0:
-                    is_anomaly = False
-
-            print('%d %d %d %d %d %d' % (lt, rt, x1, y1, x2, y2))
-
-            #process video
-            processed_vid = [[], [], []]
-            for frame_id in range(lt, rt, int(config.prepare_len / config.prepare_len_sample)):
-                rgb = vid.get_data(frame_id)
-                temp_rgb = rgb[y1:y2, x1:x2, :]
-                temp_rgb = cv2.resize(temp_rgb, (config.resize_w, config.resize_h))
-                temp_rgb = np.swapaxes(temp_rgb, 1, 2)
-                temp_rgb = np.swapaxes(temp_rgb, 0, 1)
-                #print(np.shape(temp_rgb))
-                for j in range(0, 3):
-                    processed_vid[j].append(temp_rgb[j])
-            data_hdf5 = dataset.create_dataset(name=str(i), data=processed_vid, shape=np.shape(processed_vid), dtype=int)
-            print(data_hdf5.name)
-            data_hdf5.attrs['video'] = video_id
-            data_hdf5.attrs['anomaly'] = 0
-
-            #debug
-            # print(np.shape(processed_vid))
-            # fig = plt.figure()
-            # ims = []
-            # for ii in range(0, np.shape(processed_vid)[1]):
-            #     im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
-            #     ims.append([im])
-            # ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
-            # plt.show()
-            
-            # print('finish')
-
-        #get 2000 normal samples from normal videos
-        for i in range(1000, 3000):
-            video_id = normal_videos[np.random.randint(0, len(normal_videos), 1)[0]]
-
-            filename = self.root_dir + '/' + str(video_id) + '.mp4'
-            capture = cv2.VideoCapture(filename)
-            video_max_len = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-            vid = imageio.get_reader(filename, 'ffmpeg')
-
-            lt = np.random.randint(0, video_max_len - config.prepare_len, 1)[0]
-            rt = lt + config.prepare_len
-            x1 = np.random.randint(0, config.video_size[0] - crop_size[0], 1)[0]
-            y1 = np.random.randint(0, config.video_size[1] - crop_size[1], 1)[0]
-            x2, y2 = np.array([x1, y1]) + np.array(crop_size)
-            print('%d %d %d %d %d %d' % (lt, rt, x1, y1, x2, y2))
-
-            #process video
-            processed_vid = [[], [], []]
-            for frame_id in range(lt, rt, int(config.prepare_len / config.prepare_len_sample)):
-                rgb = vid.get_data(frame_id)
-                temp_rgb = rgb[y1:y2, x1:x2, :]
-                temp_rgb = cv2.resize(temp_rgb, (config.resize_w, config.resize_h))
-                temp_rgb = np.swapaxes(temp_rgb, 1, 2)
-                temp_rgb = np.swapaxes(temp_rgb, 0, 1)
-                # print(np.shape(temp_rgb))
-                for j in range(0, 3):
-                    processed_vid[j].append(temp_rgb[j])
-
-            print(np.shape(processed_vid))
-            data_hdf5 = dataset.create_dataset(name=str(i), data=processed_vid, shape=np.shape(processed_vid), dtype=int)
-            print(data_hdf5.name)
-            data_hdf5.attrs['video'] = video_id
-            data_hdf5.attrs['anomaly'] = 0
-
-    def prepare_anomaly(self, config, dataset, anomaly_videos, normal_videos, raw_set):
+    def prepare_normal(self, dataset, anomaly_videos, normal_videos, raw_set):
         
-        #prepare_train
-        #get 1000 anomaly samples from abnormal videos
-        for i in range(0, 1000):
-            video_id = anomaly_videos[np.random.randint(0, len(anomaly_videos), 1)[0]]
-
+        for i in range(0, self.config.test_normal_size):
+            video_id = i % 100 + 1
             filename = self.root_dir + '/' + str(video_id) + '.mp4'
+            video_w, video_h = self.config.video_size
+
+            capture = cv2.VideoCapture(filename)
+            video_max_len = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        
+            #select random interval
+            l = random.randint(0, video_max_len - self.config.prepare_len)
+            r = l + self.config.prepare_len
+            x1 = random.randint(0, video_w - self.config.prepare_crop_size[0])
+            y1 = random.randint(0, video_h - self.config.prepare_crop_size[1])
+            x2 = x1 + self.config.prepare_crop_size[0]
+            y2 = y1 + self.config.prepare_crop_size[1]
+
+            while self.checkLabel(video_id, l, r, x1, y1, x2, y2):
+                l = random.randint(0, video_max_len - self.config.prepare_len)
+                r = l + self.config.prepare_len
+                x1 = random.randint(0, video_w - self.config.prepare_crop_size[0])
+                y1 = random.randint(0, video_h - self.config.prepare_crop_size[1])
+                x2 = x1 + self.config.prepare_crop_size[0]
+                y2 = y1 + self.config.prepare_crop_size[1]
+
+            capture.set(cv2.CAP_PROP_POS_FRAMES, l - 1)
+            processed_vid = []
+            for frame_id in range(l, r, self.config.prepare_len // self.config.prepare_len_sample):
+                group_id = 0
+                # while capture_frame < frame_id:
+                #     ret, frame = capture.read()
+                #     capture_frame += 1
+                ret, frame = capture.read()
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                processed_vid.append(rgb[y1: y2, x1: x2, :])
+        
+            processed_vid = np.array(processed_vid)
+            processed_vid.swapaxes(2, 3)
+            processed_vid.swapaxes(1, 2)
+            capture.release()    
+            data_hdf5 = dataset.create_dataset(name=str(i), data=processed_vid, shape=np.shape(processed_vid), dtype=int)
+            print(data_hdf5.name)
+            data_hdf5.attrs['video'] = video_id
+            data_hdf5.attrs['anomaly'] = 0
+
+    def prepare_anomaly(self, dataset, anomaly_videos, normal_videos, raw_set):
+        
+        for i in range(0, self.config.test_anomaly_size):
+            video_id = anomaly_videos[i % len(anomaly_videos)]
+            filename = self.root_dir + '/' + str(video_id) + '.mp4'
+
             capture = cv2.VideoCapture(filename)
             video_max_len = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
 
-            vid = imageio.get_reader(filename, 'ffmpeg')
-            
+            #select random interval
+            l = random.randint(raw_set[video_id][0] * self.config.video_fps, raw_set[video_id][1] * self.config.video_fps - self.config.prepare_len)
+            r = l + self.config.prepare_len
 
-            l, r = raw_set[video_id][0] * config.video_fps, raw_set[video_id][1] * config.video_fps
             anomaly_box = raw_set[video_id][2:6]
-            print(video_id)
-            print(anomaly_box)
-            crop_size = config.prepare_crop_size
-            #find random abnormal interval
-            lt = np.random.randint(l, max(r - config.prepare_len, l), 1)[0]
-            rt = min(lt + config.prepare_len, video_max_len)
-            
-            # x1 = np.random.randint(anomaly_box[0], anomaly_box[2] - int(crop_size[0]/2), 1)[0]
-            # y1 = np.random.randint(anomaly_box[1], anomaly_box[3] - int(crop_size[1]/2), 1)[0]
-
-            low = min(anomaly_box[0], max(anomaly_box[2] - crop_size[0], 0))
+            low = min(anomaly_box[0], max(anomaly_box[2] - self.config.crop_size[0], 0))
             high = anomaly_box[0]
             x1 = np.random.randint(low, high, 1)[0]
-            low = min(anomaly_box[1], max(anomaly_box[3] - crop_size[1], 0))
+            low = min(anomaly_box[1], max(anomaly_box[3] - self.config.crop_size[1], 0))
             high = anomaly_box[1]
             y1 = np.random.randint(low, high, 1)[0]
             
-            x2, y2 = np.array([x1, y1]) + np.array(crop_size)
-            x2 = min(x2, config.video_size[0])
-            y2 = min(y2, config.video_size[1])
-            print('%d %d %d %d %d %d' % (lt, rt, x1, y1, x2, y2))
+            x2, y2 = np.array([x1, y1]) + np.array(self.config.crop_size)
+            x2 = min(x2, self.config.video_size[0])
+            y2 = min(y2, self.config.video_size[1])
+            print('%d %d %d %d %d %d' % (l, r, x1, y1, x2, y2))
 
-            #process video
-            processed_vid = [[], [], []]
-            for frame_id in range(lt, rt, int(config.prepare_len / config.prepare_len_sample)):
-                rgb = vid.get_data(frame_id)
-                # plt.imshow(rgb)
-                # plt.show()
-                # print(np.shape(rgb))
-                # print(y1, ' ', y2)
-                temp_rgb = rgb[y1:y2, x1:x2, :]
-                temp_rgb = cv2.resize(temp_rgb, (config.resize_w, config.resize_h))
-                temp_rgb = np.swapaxes(temp_rgb, 1, 2)
-                temp_rgb = np.swapaxes(temp_rgb, 0, 1)
-                #print(np.shape(temp_rgb))
-                for j in range(0, 3):
-                    processed_vid[j].append(temp_rgb[j])
+            capture.set(cv2.CAP_PROP_POS_FRAMES, l - 1)
+            processed_vid = []
+            for frame_id in range(l, r, self.config.prepare_len // self.config.prepare_len_sample):
+                ret, frame = capture.read()
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                processed_vid.append(rgb[y1: y2, x1: x2, :])
+        
+            processed_vid = np.array(processed_vid)
+            processed_vid.swapaxes(2, 3)
+            processed_vid.swapaxes(1, 2)
+            capture.release()    
             data_hdf5 = dataset.create_dataset(name=str(i), data=processed_vid, shape=np.shape(processed_vid), dtype=int)
             print(data_hdf5.name)
             data_hdf5.attrs['video'] = video_id
@@ -238,6 +161,19 @@ class VideoDataset(Dataset):
         
         self.anomaly_videos = list(self.raw_set.keys())
         self.normal_videos = list(set(range(1, 101)) - set(self.anomaly_videos))
+
+    def create_dataset(self):
+        hdf5_dataset = h5py.File(self.config.prepare_hdf5_dir + '/' + self.config.dataname, 'w')
+        train_set = hdf5_dataset.create_group('test')
+        train_set.attrs['normal_length'] = self.config.normal_size
+        train_set.attrs['anomaly_length'] = self.config.anomaly_size
+        normal_set = train_set.create_group('normal')
+        anomaly_set = train_set.create_group('anomaly')
+
+        self.prepare_normal(normal_set, self.anomaly_videos, self.normal_videos, self.raw_set)
+        self.prepare_anomaly(anomaly_set, self.anomaly_videos, self.normal_videos, self.raw_set)
+
+        hdf5_dataset.close()
 
     def loadRandomCroppedVehicle(self, augmented_path):
         paths = os.listdir(augmented_path)
