@@ -76,13 +76,10 @@ class VideoDataset(Dataset):
                 x2 = x1 + self.config.prepare_crop_size[0]
                 y2 = y1 + self.config.prepare_crop_size[1]
 
-            capture.set(cv2.CAP_PROP_POS_FRAMES, l - 1)
             processed_vid = []
+            capture_frame = 0
             for frame_id in range(l, r, self.config.prepare_len // self.config.prepare_len_sample):
-                group_id = 0
-                # while capture_frame < frame_id:
-                #     ret, frame = capture.read()
-                #     capture_frame += 1
+                capture.set(cv2.CAP_PROP_POS_FRAMES, frame_id - 1)
                 ret, frame = capture.read()
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 processed_vid.append(rgb[y1: y2, x1: x2, :])
@@ -92,6 +89,18 @@ class VideoDataset(Dataset):
             print(data_hdf5.name)
             data_hdf5.attrs['video'] = video_id
             data_hdf5.attrs['anomaly'] = 0
+
+            #debug
+            # print(np.shape(processed_vid))
+            # fig = plt.figure()
+            # ims = []
+            # for ii in range(0, np.shape(processed_vid)[0]):
+            #     im = plt.imshow(processed_vid[ii], animated=True)
+            #     ims.append([im])
+            # ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
+            # plt.show()
+            
+            # print('finish')
 
     def prepare_anomaly(self, dataset, anomaly_videos, normal_videos, raw_set):
         
@@ -103,25 +112,28 @@ class VideoDataset(Dataset):
             video_max_len = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
 
             #select random interval
-            l = random.randint(raw_set[video_id][0] * self.config.video_fps, raw_set[video_id][1] * self.config.video_fps - self.config.prepare_len)
+            
+            anomaly_id = random.randint(0, len(raw_set[video_id]) - 1)
+            #print(raw_set[video_id][anomaly_id])
+            l = random.randint(raw_set[video_id][anomaly_id][0], raw_set[video_id][anomaly_id][1] - self.config.prepare_len)
             r = l + self.config.prepare_len
 
-            anomaly_box = raw_set[video_id][2:6]
-            low = min(anomaly_box[0], max(anomaly_box[2] - self.config.crop_size[0], 0))
+            anomaly_box = raw_set[video_id][anomaly_id][2:6]
+            low = min(anomaly_box[0], max(anomaly_box[2] - self.config.prepare_crop_size[0], 0))
             high = anomaly_box[0]
             x1 = np.random.randint(low, high, 1)[0]
-            low = min(anomaly_box[1], max(anomaly_box[3] - self.config.crop_size[1], 0))
+            low = min(anomaly_box[1], max(anomaly_box[3] - self.config.prepare_crop_size[1], 0))
             high = anomaly_box[1]
             y1 = np.random.randint(low, high, 1)[0]
             
-            x2, y2 = np.array([x1, y1]) + np.array(self.config.crop_size)
+            x2, y2 = np.array([x1, y1]) + np.array(self.config.prepare_crop_size)
             x2 = min(x2, self.config.video_size[0])
             y2 = min(y2, self.config.video_size[1])
-            print('%d %d %d %d %d %d' % (l, r, x1, y1, x2, y2))
+            #print('%d %d %d %d %d %d' % (l, r, x1, y1, x2, y2))
 
-            capture.set(cv2.CAP_PROP_POS_FRAMES, l - 1)
             processed_vid = []
             for frame_id in range(l, r, self.config.prepare_len // self.config.prepare_len_sample):
+                capture.set(cv2.CAP_PROP_POS_FRAMES, frame_id - 1)
                 ret, frame = capture.read()
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 processed_vid.append(rgb[y1: y2, x1: x2, :])
@@ -136,8 +148,8 @@ class VideoDataset(Dataset):
             # print(np.shape(processed_vid))
             # fig = plt.figure()
             # ims = []
-            # for ii in range(0, np.shape(processed_vid)[1]):
-            #     im = plt.imshow(np.dstack((processed_vid[0][ii], processed_vid[1][ii], processed_vid[2][ii])), animated=True)
+            # for ii in range(0, np.shape(processed_vid)[0]):
+            #     im = plt.imshow(processed_vid[ii], animated=True)
             #     ims.append([im])
             # ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
             # plt.show()
@@ -164,8 +176,8 @@ class VideoDataset(Dataset):
     def create_dataset(self):
         hdf5_dataset = h5py.File(self.config.prepare_hdf5_dir + '/' + self.config.dataname, 'w')
         train_set = hdf5_dataset.create_group('test')
-        train_set.attrs['normal_length'] = self.config.normal_size
-        train_set.attrs['anomaly_length'] = self.config.anomaly_size
+        train_set.attrs['normal_length'] = self.config.test_normal_size
+        train_set.attrs['anomaly_length'] = self.config.test_anomaly_size
         normal_set = train_set.create_group('normal')
         anomaly_set = train_set.create_group('anomaly')
 
@@ -216,7 +228,10 @@ class VideoDataset(Dataset):
         return label
 
     def __len__(self):
-        return self.config.step_per_epoch
+        if self.phase == 'train':
+            return self.config.step_per_epoch
+        elif self.phase == 'test':
+            return self.dataset[self.phase].attrs['normal_length'] + self.dataset[self.phase].attrs['anomaly_length']
 
     def __getitem__(self, index):
         if self.phase == 'train':
@@ -340,13 +355,14 @@ class VideoDataset(Dataset):
             else:
                 set_name = 'anomaly'
                 set_id = index - self.dataset[self.phase].attrs['normal_length']
-            buffer = np.array(self.dataset[self.phase + '/' + set_name + '/' + str(set_id)][()], dtype=np.dtype('float32'))
+            buffer = np.array(self.dataset[self.phase + '/' + set_name + '/' + str(set_id)][()], dtype=np.float32)
             label = self.dataset[self.phase + '/' + set_name + '/' + str(set_id)].attrs['anomaly']
 
+            batch = []
             for i in range(0, self.config.prepare_len_sample):
-                buffer[i] = cv2.resize(buffer[i], self.config.resized_shape)
+                batch.append(cv2.resize(buffer[i], self.config.resized_shape))
 
-            batch = np.array(buffer, dtype=np.float32)
+            batch = np.array(batch, dtype=np.float32)
             batch = np.swapaxes(batch, 2, 3)
             batch = np.swapaxes(batch, 1, 2)
             batch = np.swapaxes(batch, 0, 1)
@@ -358,10 +374,12 @@ if __name__ == "__main__":
     sys.path.append('../')
     from torch.utils.data import DataLoader
     import config_net
-    train_data = VideoDataset(config_net, dataset='aicity', preprocess=False)    
-    train_dataloader = DataLoader(train_data, batch_size=1, shuffle=False, num_workers=1)
+    val_data = VideoDataset(config_net, phase='test', dataset='aicity', preprocess=True)    
+    val_dataloader = DataLoader(val_data, batch_size=1, shuffle=False, num_workers=1)
 
-    for inputs, labels in train_dataloader:
+    print (len(val_dataloader))
+
+    for inputs, labels in val_dataloader:
         print(inputs.shape, ' ', labels.shape)
         #break
 

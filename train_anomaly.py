@@ -22,7 +22,7 @@ print("Device being used:", device)
 
 nEpochs = 100  # Number of epochs for training
 resume_epoch = 0  # Default is 0, change if want to resume
-snapshot = 3 # Store a model every snapshot epochs
+snapshot = 5 # Store a model every snapshot epochs
 lr = 1e-5 # Learning rate
 
 dataset = 'aicity' #ai city dataset
@@ -65,8 +65,8 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     else:
         print('We only implemented C3D and R2Plus1D models.')
         raise NotImplementedError
-    #criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
-    criterion = FocalLoss(device=device, gamma=2)
+    criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
+    #criterion = FocalLoss(device=device, gamma=2)
     optimizer = optim.SGD(train_params, lr=lr, momentum=0.9, weight_decay=5e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100,
                                           gamma=0.1)  # the scheduler divides the lr by 10 every 10 epochs
@@ -91,7 +91,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
 
     print('Training model on {} dataset...'.format(dataset))
     train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, phase='train'), batch_size=1, shuffle=True, num_workers=1)
-    val_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, phase='val'), batch_size=1, shuffle=False, num_workers=1)
+    val_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, phase='test'), batch_size=1, shuffle=False, num_workers=1)
 
     for epoch in range(resume_epoch, num_epochs):
         print('Training epoch: ', epoch)
@@ -155,15 +155,19 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                 model.eval()
                 total_step = 0
                 for inputs, labels in val_dataloader:
+                    input = inputs.to(device)
+                    label = labels.to(device)
                     with torch.no_grad():
-                        outputs = model(inputs)
+                        outputs = model(input)
                     
                     probs = nn.Softmax(dim=1)(outputs)
+                    #print(probs)
                     preds = torch.max(probs, 1)[1]
-                    loss = criterion(outputs, labels)
+                    loss = criterion(outputs, label)
 
+                    #print(label.data)
                     running_loss += loss.item() * inputs.size(0)
-                    running_corrects += torch.sum(preds == labels.data)
+                    running_corrects += torch.sum(preds == label.data)
                     total_step += 1
 
                 epoch_loss = running_loss / total_step

@@ -1,7 +1,7 @@
 #prepare data
 def db_dir(dataset = 'aicity'):
     if (dataset == 'aicity'):
-        root_dir = '/media/tuanbi97/Tuanbi97/APCS/Thesis/Codes/VestyCity/data2'
+        root_dir = '/media/tuanbi97/Tuanbi97/APCS/Thesis/Codes/VestyCity/data'
         output_dir = '/media/tuanbi97/Tuanbi97/APCS/Thesis/Codes/VestyCity/output'
     
     return root_dir, output_dir
@@ -29,7 +29,7 @@ crop_size = 112
 
 #train
 batch_size = 2
-step_per_epoch = 1
+step_per_epoch = 100
 step_w = 80
 step_h = 125
 
