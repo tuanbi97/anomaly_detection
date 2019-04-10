@@ -6,7 +6,11 @@ def db_dir(dataset = 'aicity'):
     
     return root_dir, output_dir
 
-dataname = 'AiCity.hdf5'
+dataname = 'AiCityTest.hdf5'
+test_normal_size = 100
+test_anomaly_size = 100
+test_aug_anomaly_size = 0
+
 prepare_cropped_vehicles = '/media/tuanbi97/Tuanbi97/APCS/Thesis/Codes/VestyCity/data/cropped_vehicles'
 prepare_train_dir = '/media/tuanbi97/Tuanbi97/APCS/Thesis/Codes/VestyCity/data/train'
 prepare_test_dir = '/media/tuanbi97/Tuanbi97/APCS/Thesis/Codes/VestyCity/data/test'

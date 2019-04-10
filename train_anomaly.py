@@ -90,12 +90,13 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     writer = SummaryWriter(log_dir=log_dir)
 
     print('Training model on {} dataset...'.format(dataset))
-    train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset), batch_size=1, shuffle=True, num_workers=1)
+    train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, phase='train'), batch_size=1, shuffle=True, num_workers=1)
+    val_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, phase='val'), batch_size=1, shuffle=False, num_workers=1)
 
     for epoch in range(resume_epoch, num_epochs):
         print('Training epoch: ', epoch)
         # each epoch has a training and validation step
-        for phase in ['train']:
+        for phase in ['train', 'test']:
             start_time = timeit.default_timer()
 
             # reset the running loss and corrects
@@ -108,66 +109,74 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                 # scheduler.step() is to be called once every epoch during training
                 scheduler.step()
                 model.train()
-            else:
-                model.eval()
-
-            total_step = 0
-            total_loss = 0
-            for inputs, labels in train_dataloader:
-                
-                batch_size = len(inputs[0])
-                for i in range(0, len(inputs[0])):
+                total_step = 0
+                for inputs, labels in train_dataloader:
                     optimizer.zero_grad()
-                    input = inputs[0][i].unsqueeze(0)
-                    label = labels[0][i].unsqueeze(0)
-                    input = Variable(input, requires_grad = True).to(device)
-                    label = Variable(label).to(device)
-                    
-
-                    if phase == 'train':
+                    batch_size = len(inputs[0])
+                    for i in range(0, len(inputs[0])):
+                        input = inputs[0][i].unsqueeze(0)
+                        label = labels[0][i].unsqueeze(0)
+                        input = Variable(input, requires_grad = True).to(device)
+                        label = Variable(label).to(device)
+                        
                         outputs = model(input)
 
-                    print(label)
-                    print('output: ', outputs)
-                    probs = nn.Softmax(dim=1)(outputs)
-                    print('softmax: ', probs)
-                    preds = torch.max(probs, 1)[1]
-                    loss = criterion(outputs, label)
-                    print('loss: ', loss.item())
-
-                    # if (label[0] == 1):
-                    #     loss *= 8
-
-                    if phase == 'train':
+                        #print('output: ', outputs)
+                        probs = nn.Softmax(dim=1)(outputs)
+                        #print('softmax: ', probs)
+                        preds = torch.max(probs, 1)[1]
+                        loss = criterion(outputs, label)
                         loss.backward()
-                        optimizer.step()
 
-                    running_loss += loss.item()
-                    running_corrects += torch.sum(preds == label.data)
-                    total_step += 1
-                
-                # if phase == 'train':
-                #     optimizer.step()
+                        running_loss += loss.item()
+                        running_corrects += torch.sum(preds == label.data)
+                        total_step += 1
+                    
+                    optimizer.step()
 
-            print(running_loss, ' ', total_step)
-            epoch_loss = running_loss / total_step
-            epoch_acc = running_corrects.double() / total_step
+                epoch_loss = running_loss / total_step
+                epoch_acc = running_corrects.double() / total_step
 
-            if phase == 'train':
                 writer.add_scalar('data/train_loss_epoch', epoch_loss, epoch)
                 writer.add_scalar('data/train_acc_epoch', epoch_acc, epoch)
 
-            print("[{}] Epoch: {}/{} Loss: {} Acc: {}".format(phase, epoch+1, nEpochs, epoch_loss, epoch_acc))
-            stop_time = timeit.default_timer()
-            print("Execution time: " + str(stop_time - start_time) + "\n")
+                print("[{}] Epoch: {}/{} Loss: {} Acc: {}".format(phase, epoch+1, nEpochs, epoch_loss, epoch_acc))
+                stop_time = timeit.default_timer()
+                print("Execution time: " + str(stop_time - start_time) + "\n")
 
-        if epoch % save_epoch == (save_epoch - 1):
-            torch.save({
-                'epoch': epoch + 1,
-                'state_dict': model.state_dict(),
-                'opt_dict': optimizer.state_dict(),
-            }, os.path.join(save_dir, 'models', saveName + '_epoch-' + str(epoch) + '.pth.tar'))
-            print("Save model at {}\n".format(os.path.join(save_dir, 'models', saveName + '_epoch-' + str(epoch) + '.pth.tar')))
+                if epoch % save_epoch == (save_epoch - 1):
+                    torch.save({
+                        'epoch': epoch + 1,
+                        'state_dict': model.state_dict(),
+                        'opt_dict': optimizer.state_dict(),
+                    }, os.path.join(save_dir, 'models', saveName + '_epoch-' + str(epoch) + '.pth.tar'))
+                    print("Save model at {}\n".format(os.path.join(save_dir, 'models', saveName + '_epoch-' + str(epoch) + '.pth.tar')))
+            else:
+                model.eval()
+                total_step = 0
+                for inputs, labels in val_dataloader:
+                    with torch.no_grad():
+                        outputs = model(inputs)
+                    
+                    probs = nn.Softmax(dim=1)(outputs)
+                    preds = torch.max(probs, 1)[1]
+                    loss = criterion(outputs, labels)
+
+                    running_loss += loss.item() * inputs.size(0)
+                    running_corrects += torch.sum(preds == labels.data)
+                    total_step += 1
+
+                epoch_loss = running_loss / total_step
+                epoch_acc = running_corrects.double() / total_step
+
+                writer.add_scalar('data/val_loss_epoch', epoch_loss, epoch)
+                writer.add_scalar('data/val_acc_epoch', epoch_acc, epoch)
+
+                print("[{}] Epoch: {}/{} Loss: {} Acc: {}".format(phase, epoch+1, nEpochs, epoch_loss, epoch_acc))
+                stop_time = timeit.default_timer()
+                print("Execution time: " + str(stop_time - start_time) + "\n")
+
+            
 
     writer.close()
 
