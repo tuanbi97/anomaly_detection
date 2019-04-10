@@ -34,6 +34,16 @@ class VideoDataset(Dataset):
         # ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000, repeat=False)
         # plt.show()
 
+    def get_length(self, dtype):
+        if not self.dataset:
+            return 0
+        if (dtype == 0):
+            return self.dataset[self.phase].attrs['normal_length']
+        if (dtype == 1):
+            return self.dataset[self.phase].attrs['anomaly_length']
+        if (dtype == 2):
+            return self.dataset[self.phase].attrs['normal_length'] + self.dataset[self.phase].attrs['anomaly_length']
+
     def box_intersect(self, box1, box2):
         xmin = max(box1[0], box2[0])
         xmax = min(box1[2], box2[2])
@@ -235,7 +245,11 @@ class VideoDataset(Dataset):
 
     def __getitem__(self, index):
         if self.phase == 'train':
-            video_id = index + 1
+            if index % 2 == 0:
+                video_id = self.normal_videos[random.randint(0, len(self.normal_videos) - 1)]
+            else:
+                video_id = self.anomaly_videos[random.randint(0, len(self.anomaly_videos) - 1)]
+            #video_id = index + 1
             # video_id = 93
             filename = self.root_dir + '/' + str(video_id) + '.mp4'
             #print(filename)

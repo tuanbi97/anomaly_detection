@@ -29,7 +29,7 @@ crop_size = 112
 
 #train
 batch_size = 2
-step_per_epoch = 100
+step_per_epoch = 2
 step_w = 80
 step_h = 125
 

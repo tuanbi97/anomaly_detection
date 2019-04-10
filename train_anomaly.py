@@ -91,7 +91,8 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
 
     print('Training model on {} dataset...'.format(dataset))
     train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, phase='train'), batch_size=1, shuffle=True, num_workers=1)
-    val_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset, phase='test'), batch_size=1, shuffle=False, num_workers=1)
+    val_dataset = VideoDataset(config=config, dataset=dataset, phase='test')
+    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=1)
 
     for epoch in range(resume_epoch, num_epochs):
         print('Training epoch: ', epoch)
@@ -154,6 +155,8 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
             else:
                 model.eval()
                 total_step = 0
+                normal_corrects = 0
+                anomaly_corrects = 0
                 for inputs, labels in val_dataloader:
                     input = inputs.to(device)
                     label = labels.to(device)
@@ -168,15 +171,22 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                     #print(label.data)
                     running_loss += loss.item() * inputs.size(0)
                     running_corrects += torch.sum(preds == label.data)
+                    for i in range(0, len(label)):
+                        if label[i] == 0 and preds[i] == 0:
+                            normal_corrects += 1
+                        if label[i] == 1 and preds[i] == 1:
+                            anomaly_corrects += 1
                     total_step += 1
 
                 epoch_loss = running_loss / total_step
                 epoch_acc = running_corrects.double() / total_step
+                normal_corrects /= val_dataset.get_length(0) #normal 0 anomaly 1 total 2
+                anomaly_corrects /= val_dataset.get_length(1)
 
                 writer.add_scalar('data/val_loss_epoch', epoch_loss, epoch)
                 writer.add_scalar('data/val_acc_epoch', epoch_acc, epoch)
 
-                print("[{}] Epoch: {}/{} Loss: {} Acc: {}".format(phase, epoch+1, nEpochs, epoch_loss, epoch_acc))
+                print("[{}] Epoch: {}/{} Loss: {} Acc: {} Acc_normal: {} Acc_anomaly: {}".format(phase, epoch+1, nEpochs, epoch_loss, epoch_acc, normal_corrects, anomaly_corrects))
                 stop_time = timeit.default_timer()
                 print("Execution time: " + str(stop_time - start_time) + "\n")
 
