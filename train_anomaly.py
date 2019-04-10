@@ -23,7 +23,7 @@ print("Device being used:", device)
 nEpochs = 100  # Number of epochs for training
 resume_epoch = 0  # Default is 0, change if want to resume
 snapshot = 3 # Store a model every snapshot epochs
-lr = 1e-6 # Learning rate
+lr = 1e-3 # Learning rate
 
 dataset = 'aicity' #ai city dataset
 
@@ -32,7 +32,7 @@ if dataset == 'hmdb51':
 elif dataset == 'ucf101':
     num_classes = 101
 elif dataset == 'aicity':
-    num_classes = 2
+    num_classes = 1
 else:
     print('We only implemented hmdb and ucf datasets.')
     raise NotImplementedError
@@ -60,14 +60,14 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     """
     if modelName == 'R2Plus1D':
         model = R2Plus1D_model.R2Plus1DClassifier(num_classes=num_classes, layer_sizes=(2, 2, 2, 2))
-        train_params = [{'params': R2Plus1D_model.get_1x_lr_params(model), 'lr': lr},
-                        {'params': R2Plus1D_model.get_10x_lr_params(model), 'lr': lr * 10}]
+        #train_params = [{'params': R2Plus1D_model.get_1x_lr_params(model), 'lr': lr},
+        #                {'params': R2Plus1D_model.get_10x_lr_params(model), 'lr': lr * 10}]
     else:
         print('We only implemented C3D and R2Plus1D models.')
         raise NotImplementedError
-    criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
-    #criterion = FocalLoss(device=device, gamma=1)
-    optimizer = optim.SGD(train_params, lr=lr, momentum=0.9, weight_decay=5e-4)
+    #criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
+    criterion = FocalLoss(gamma=2, alpha=0.75, size_average=False)
+    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=5e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=40,
                                           gamma=0.1)  # the scheduler divides the lr by 10 every 10 epochs
 
@@ -91,6 +91,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
 
     print('Training model on {} dataset...'.format(dataset))
     train_dataloader = DataLoader(VideoDataset(config=config, dataset=dataset), batch_size=1, shuffle=True, num_workers=1)
+    print('Bias: ', model.linear.bias.data)
 
     for epoch in range(resume_epoch, num_epochs):
         print('Training epoch: ', epoch)
@@ -116,21 +117,24 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
             for inputs, labels in train_dataloader:
                 optimizer.zero_grad()
                 batch_size = len(inputs[0])
+                total_loss = 0
+                prec = 0
                 for i in range(0, len(inputs[0])):
                     input = inputs[0][i].unsqueeze(0)
                     label = labels[0][i].unsqueeze(0)
                     input = Variable(input, requires_grad = True).to(device)
                     label = Variable(label).to(device)
-                    
 
                     if phase == 'train':
                         outputs = model(input)
 
-                    print('output: ', outputs)
-                    probs = nn.Softmax(dim=1)(outputs)
-                    print('softmax: ', probs)
-                    preds = torch.max(probs, 1)[1]
+                    #print('output: ', outputs)
+                    probs = nn.Sigmoid()(outputs)
+                    print('Sigmoid: ', probs.item())
+                    preds = (probs.data > 0.5).long()
                     loss = criterion(outputs, label)
+                    loss /= batch_size
+                    print('Partial loss: ', loss.item())
 
                     # if (label[0] == 1):
                     #     loss *= 8
@@ -141,10 +145,21 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
 
                     running_loss += loss.item()
                     running_corrects += torch.sum(preds == label.data)
+                    #print(preds.item(), label.data.item())
+                    prec += torch.sum(preds == label.data & label.data == 1)
                     total_step += 1
+                    total_loss += torch.sum(label.data == 1)
                 
                 if phase == 'train':
+                    print('-'*50)
+                    print('Precision: {}/{}'.format(prec.item(),total_loss.item()))
+                    print('Loss: {}'.format(running_loss/total_step))
+                    print('-'*50)
                     optimizer.step()
+                    #print('total loss: ', total_loss / batch_size)
+                    #print('total positive: ', prec.item())
+                    total_loss = 0
+                    prec = 0
 
             epoch_loss = running_loss / total_step
             epoch_acc = running_corrects.double() / total_step
@@ -153,7 +168,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                 writer.add_scalar('data/train_loss_epoch', epoch_loss, epoch)
                 writer.add_scalar('data/train_acc_epoch', epoch_acc, epoch)
 
-            print("[{}] Epoch: {}/{} Loss: {} Acc: {}".format(phase, epoch+1, nEpochs, epoch_loss, epoch_acc))
+            print("[{}] Epoch: {}/{} Loss: {} Pre: {}".format(phase, epoch+1, nEpochs, epoch_loss, epoch_acc))
             stop_time = timeit.default_timer()
             print("Execution time: " + str(stop_time - start_time) + "\n")
 
