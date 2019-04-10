@@ -7,6 +7,7 @@ import glob
 import torch
 from tensorboardX import SummaryWriter
 from torch import nn, optim
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 import numpy as np
@@ -23,7 +24,7 @@ print("Device being used:", device)
 nEpochs = 100  # Number of epochs for training
 resume_epoch = 0  # Default is 0, change if want to resume
 snapshot = 5 # Store a model every snapshot epochs
-lr = 1e-5 # Learning rate
+lr = 1e-4 # Learning rate
 
 dataset = 'aicity' #ai city dataset
 
@@ -32,7 +33,7 @@ if dataset == 'hmdb51':
 elif dataset == 'ucf101':
     num_classes = 101
 elif dataset == 'aicity':
-    num_classes = 2
+    num_classes = 1
 else:
     print('We only implemented hmdb and ucf datasets.')
     raise NotImplementedError
@@ -65,8 +66,8 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     else:
         print('We only implemented C3D and R2Plus1D models.')
         raise NotImplementedError
-    criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
-    #criterion = FocalLoss(device=device, gamma=2)
+    #criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
+    criterion = FocalLoss(device=device, gamma=2)
     optimizer = optim.SGD(train_params, lr=lr, momentum=0.9, weight_decay=5e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100,
                                           gamma=0.1)  # the scheduler divides the lr by 10 every 10 epochs
@@ -84,7 +85,6 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
 
     print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters()) / 1000000.0))
     model.to(device)
-    criterion.to(device)
 
     log_dir = os.path.join(save_dir, 'models', datetime.now().strftime('%b%d_%H-%M-%S') + '_' + socket.gethostname())
     writer = SummaryWriter(log_dir=log_dir)
@@ -111,29 +111,34 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                 scheduler.step()
                 model.train()
                 total_step = 0
+
+                optimizer.zero_grad()
                 for inputs, labels in train_dataloader:
-                    optimizer.zero_grad()
                     batch_size = len(inputs[0])
                     for i in range(0, len(inputs[0])):
                         input = inputs[0][i].unsqueeze(0)
-                        label = labels[0][i].unsqueeze(0)
+                        label = labels[0][i].unsqueeze(0).unsqueeze(0)
                         input = Variable(input, requires_grad = True).to(device)
-                        label = Variable(label).to(device)
+                        label = Variable(label, requires_grad = False).to(device)
                         
                         outputs = model(input)
 
                         #print('output: ', outputs)
-                        probs = nn.Softmax(dim=1)(outputs)
-                        #print('softmax: ', probs)
-                        preds = torch.max(probs, 1)[1]
-                        loss = criterion(outputs, label)
+                        probs = F.sigmoid(outputs)
+                        #print(label)
+                        #print('sigmoid: ', probs)
+                        preds = (probs > 0.5).long()
+                        #print('threshold: ', preds)
+                        #loss = F.binary_cross_entropy(probs, label.float())
+                        loss = criterion(probs, label.float())
+                        #print(loss)
                         loss.backward()
 
                         running_loss += loss.item()
                         running_corrects += torch.sum(preds == label.data)
                         total_step += 1
                     
-                    optimizer.step()
+                optimizer.step()
 
                 epoch_loss = running_loss / total_step
                 epoch_acc = running_corrects.double() / total_step
@@ -159,14 +164,16 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                 anomaly_corrects = 0
                 for inputs, labels in val_dataloader:
                     input = inputs.to(device)
-                    label = labels.to(device)
+                    label = labels.unsqueeze(0).to(device)
                     with torch.no_grad():
                         outputs = model(input)
                     
-                    probs = nn.Softmax(dim=1)(outputs)
-                    #print(probs)
-                    preds = torch.max(probs, 1)[1]
-                    loss = criterion(outputs, label)
+                    
+                    probs = F.sigmoid(outputs)
+                    #print('sigmoid: ', probs)
+                    preds = (probs > 0.5).long()
+                    loss = criterion(probs, label.float())
+                    #loss = F.binary_cross_entropy(probs, label.float())
 
                     #print(label.data)
                     running_loss += loss.item() * inputs.size(0)
@@ -189,8 +196,6 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                 print("[{}] Epoch: {}/{} Loss: {} Acc: {} Acc_normal: {} Acc_anomaly: {}".format(phase, epoch+1, nEpochs, epoch_loss, epoch_acc, normal_corrects, anomaly_corrects))
                 stop_time = timeit.default_timer()
                 print("Execution time: " + str(stop_time - start_time) + "\n")
-
-            
 
     writer.close()
 

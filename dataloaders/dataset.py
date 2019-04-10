@@ -257,8 +257,13 @@ class VideoDataset(Dataset):
             video_max_len = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
 
             #select random interval
-            l = random.randint(0, video_max_len - self.config.prepare_len)
-            r = l + self.config.prepare_len
+            if index % 2 == 0:
+                l = random.randint(0, video_max_len - self.config.prepare_len)
+                r = l + self.config.prepare_len
+            else:
+                anomaly_id = random.randint(0, len(self.raw_set[video_id]) - 1)
+                l = random.randint(self.raw_set[video_id][anomaly_id][0], self.raw_set[video_id][anomaly_id][1] - self.config.prepare_len)
+                r = l + self.config.prepare_len
 
             #split region in an interval
             video_w, video_h = self.config.video_size
