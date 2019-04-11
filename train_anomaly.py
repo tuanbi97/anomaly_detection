@@ -24,7 +24,7 @@ print("Device being used:", device)
 nEpochs = 100  # Number of epochs for training
 resume_epoch = 0  # Default is 0, change if want to resume
 snapshot = 5 # Store a model every snapshot epochs
-lr = 1e-4 # Learning rate
+lr = 1e-3 # Learning rate
 
 dataset = 'aicity' #ai city dataset
 
@@ -61,15 +61,15 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     """
     if modelName == 'R2Plus1D':
         model = R2Plus1D_model.R2Plus1DClassifier(num_classes=num_classes, layer_sizes=(2, 2, 2, 2))
-        train_params = [{'params': R2Plus1D_model.get_1x_lr_params(model), 'lr': lr},
-                        {'params': R2Plus1D_model.get_10x_lr_params(model), 'lr': lr * 10}]
+        #train_params = [{'params': R2Plus1D_model.get_1x_lr_params(model), 'lr': lr},
+        #                {'params': R2Plus1D_model.get_10x_lr_params(model), 'lr': lr * 10}]
     else:
         print('We only implemented C3D and R2Plus1D models.')
         raise NotImplementedError
     #criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
-    criterion = FocalLoss(device=device, gamma=2)
-    optimizer = optim.SGD(train_params, lr=lr, momentum=0.9, weight_decay=5e-4)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100,
+    criterion = FocalLoss(gamma=2, size_average=False)
+    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=5e-4)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=40,
                                           gamma=0.1)  # the scheduler divides the lr by 10 every 10 epochs
 
     if resume_epoch == 0:
@@ -124,13 +124,13 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                         outputs = model(input)
 
                         #print('output: ', outputs)
-                        probs = F.sigmoid(outputs)
+                        probs = nn.Sigmoid()(outputs)
                         #print(label)
                         #print('sigmoid: ', probs)
-                        preds = (probs > 0.5).long()
+                        preds = (probs.data > 0.5).long()
                         #print('threshold: ', preds)
                         #loss = F.binary_cross_entropy(probs, label.float())
-                        loss = criterion(probs, label.float())
+                        loss = criterion(outputs, label)
                         #print(loss)
                         loss.backward()
 
@@ -169,10 +169,10 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                         outputs = model(input)
                     
                     
-                    probs = F.sigmoid(outputs)
+                    probs = nn.Sigmoid()(outputs)
                     #print('sigmoid: ', probs)
                     preds = (probs > 0.5).long()
-                    loss = criterion(probs, label.float())
+                    loss = criterion(outputs, label)
                     #loss = F.binary_cross_entropy(probs, label.float())
 
                     #print(label.data)

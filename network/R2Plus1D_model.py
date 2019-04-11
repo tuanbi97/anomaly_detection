@@ -259,7 +259,7 @@ class R2Plus1DClassifier(nn.Module):
             s_dict[name] = p_dict[name]
         self.load_state_dict(s_dict)
 
-    def __init_weight(self):
+    def __init_weight(self, pi=0.01):
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
                 # n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
@@ -269,6 +269,7 @@ class R2Plus1DClassifier(nn.Module):
                 if isinstance(m, nn.BatchNorm3d):
                     m.weight.data.fill_(1)
                     m.bias.data.zero_()
+        nn.init.constant_(self.linear.bias, -math.log((1-pi)/pi))
 
 def get_1x_lr_params(model):
     """
